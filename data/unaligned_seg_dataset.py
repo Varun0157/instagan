@@ -38,7 +38,7 @@ class UnalignedSegDataset(BaseDataset):
 		for i in range(self.max_instances):
 			path = seg_path.replace('.png', '_{}.png'.format(i))
 			if os.path.isfile(path):
-				seg = Image.open(path).convert('L')
+				seg = Image.open(path).convert('RGB')
 				seg = self.fixed_transform(seg, seed)
 				segs.append(seg)
 			else:
