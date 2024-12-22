@@ -1,17 +1,20 @@
 import time
+from models.insta_gan_model import InstaGANModel
 from options.train_options import TrainOptions
 from data import CreateDataLoader
 from models import create_model
 from util.visualizer import Visualizer
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     opt = TrainOptions().parse()
     data_loader = CreateDataLoader(opt)
     dataset = data_loader.load_data()
     dataset_size = len(data_loader)
-    print('#training images = %d' % dataset_size)
+    print("#training images = %d" % dataset_size)
 
     model = create_model(opt)
+    assert type(model) == InstaGANModel  # to make type checking easier
+
     model.setup(opt)
     visualizer = Visualizer(opt)
     total_steps = 0
@@ -33,26 +36,38 @@ if __name__ == '__main__':
 
             if total_steps % opt.display_freq == 0:
                 save_result = total_steps % opt.update_html_freq == 0
-                visualizer.display_current_results(model.get_current_visuals(), epoch, save_result)
+                visualizer.display_current_results(
+                    model.get_current_visuals(), epoch, save_result
+                )
 
             if total_steps % opt.print_freq == 0:
                 losses = model.get_current_losses()
                 t = (time.time() - iter_start_time) / opt.batch_size
                 visualizer.print_current_losses(epoch, epoch_iter, losses, t, t_data)
                 if opt.display_id > 0:
-                    visualizer.plot_current_losses(epoch, float(epoch_iter) / dataset_size, opt, losses)
+                    visualizer.plot_current_losses(
+                        epoch, float(epoch_iter) / dataset_size, opt, losses
+                    )
 
             if total_steps % opt.save_latest_freq == 0:
-                print('saving the latest model (epoch %d, total_steps %d)' % (epoch, total_steps))
-                save_suffix = 'iter_%d' % total_steps if opt.save_by_iter else 'latest'
+                print(
+                    "saving the latest model (epoch %d, total_steps %d)"
+                    % (epoch, total_steps)
+                )
+                save_suffix = "iter_%d" % total_steps if opt.save_by_iter else "latest"
                 model.save_networks(save_suffix)
 
             iter_data_time = time.time()
         if epoch % opt.save_epoch_freq == 0:
-            print('saving the model at the end of epoch %d, iters %d' % (epoch, total_steps))
-            model.save_networks('latest')
+            print(
+                "saving the model at the end of epoch %d, iters %d"
+                % (epoch, total_steps)
+            )
+            model.save_networks("latest")
             model.save_networks(epoch)
 
-        print('End of epoch %d / %d \t Time Taken: %d sec' %
-              (epoch, opt.niter + opt.niter_decay, time.time() - epoch_start_time))
+        print(
+            "End of epoch %d / %d \t Time Taken: %d sec"
+            % (epoch, opt.niter + opt.niter_decay, time.time() - epoch_start_time)
+        )
         model.update_learning_rate()
