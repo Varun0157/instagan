@@ -45,6 +45,7 @@ def generate_ccp_dataset_train(args, imset, cat):
 	seg_path.mkdir()
 
 	cat_id = get_cat_id(args.label_list, cat)
+	assert cat_id is not None
 
 	pb = tqdm(total=len(args.pix_ann_ids))
 	pb.set_description('train{}'.format(imset))
@@ -66,6 +67,7 @@ def generate_ccp_dataset_val(args, imset, cat):
 	seg_path.mkdir()
 
 	cat_id = get_cat_id(args.label_list, cat)
+	assert cat_id is not None
 
 	pb = tqdm(total=len(args.img_ann_ids))
 	pb.set_description('val{}'.format(imset))
@@ -74,6 +76,9 @@ def generate_ccp_dataset_val(args, imset, cat):
 		if np.isin(ann, cat_id).sum() > 0:
 			img = Image.open(args.img_root / '{}.jpg'.format(ann_id))
 			img.save(img_path / '{}.png'.format(ann_id))
+			seg = (ann == cat_id).astype('uint8')
+			seg = Image.fromarray(seg * 255)
+			seg.save(seg_path / '{}_0.png'.format(ann_id))
 		pb.update(1)
 	pb.close()
 
