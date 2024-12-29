@@ -368,6 +368,8 @@ class ResnetSetGenerator(nn.Module):
                 else:
                     out.append(segs[b:b+1, i:i+1, :, :])
 
+        for item in out:
+            print(item.shape)
         return torch.cat(out, dim=1)
 
 
