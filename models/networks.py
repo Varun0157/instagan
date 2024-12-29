@@ -295,6 +295,10 @@ class ResnetSetGenerator(nn.Module):
         img = inp[:, :self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc:, :, :]  # (B, CA, W, H)
         mean = (segs + 1).mean(0).mean(-1).mean(-1)
+        
+        print("img: ", img.shape)
+        print("segs: ", segs.shape)
+        
         if mean.sum() == 0:
             mean[0] = 1  # forward at least one segmentation
 
@@ -308,8 +312,12 @@ class ResnetSetGenerator(nn.Module):
         enc_segs = torch.cat(enc_segs)
         enc_segs_sum = torch.sum(enc_segs, dim=0, keepdim=True)  # aggregated set feature
 
+        print("enc_img: ", enc_img.shape)
+        print("enc_segs: ", enc_segs.shape)
+
         # run decoder
         feat = torch.cat([enc_img, enc_segs_sum], dim=1)
+        print("feat: ", feat.shape)
         out = [self.decoder_img(feat)]
         idx = 0
         for i in range(segs.size(1)):
