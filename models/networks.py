@@ -328,35 +328,8 @@ class ResnetSetGenerator(nn.Module):
         enc_segs_sum = torch.stack(enc_segs_list, dim=0)  # (B, 1, ngf, w, h)
         enc_segs_sum = enc_segs_sum.squeeze(1)  # (B, ngf, w, h) 
 
-        # print("enc_img: ", enc_img.shape)   
-        # print("enc_segs_sum: ", enc_segs_sum.shape)
         feat = torch.cat([enc_img, enc_segs_sum], dim=1)  # (B, 2*ngf, w, h)
-        # print("feat: ", feat.shape)
         out = [self.decoder_img(feat)]
-        # for i in range(segs.size(1)):
-        #     if mean[i] > 0:  # skip empty segmentation
-        #         seg = segs[:, i, :, :].unsqueeze(1)
-        #         enc_segs.append(self.encoder_seg(seg))
-        # enc_segs = torch.cat(enc_segs)
-        # enc_segs_sum = torch.sum(enc_segs, dim=0, keepdim=True)  # aggregated set feature
-
-        # print("enc_img: ", enc_img.shape)
-        # print("enc_segs: ", enc_segs.shape)
-        # print("enc_segs_sum", enc_segs_sum.shape)
-
-        # # run decoder
-        # feat = torch.cat([enc_img, enc_segs_sum], dim=1)
-        # # print("feat: ", feat.shape)
-        # out = [self.decoder_img(feat)]
-        # idx = 0
-        # for i in range(segs.size(1)):
-        #     if mean[i] > 0:
-        #         enc_seg = enc_segs[idx].unsqueeze(0)  # (1, ngf, w, h)
-        #         idx += 1  # move to next index
-        #         feat = torch.cat([enc_seg, enc_img, enc_segs_sum], dim=1)
-        #         out += [self.decoder_seg(feat)]
-        #     else:
-        #         out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
         
         for i in range(NUM_SEGS):
             batch_seg_outputs = []
