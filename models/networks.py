@@ -294,41 +294,76 @@ class ResnetSetGenerator(nn.Module):
         # split data
         img = inp[:, :self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc:, :, :]  # (B, CA, W, H)
-        mean = (segs + 1).mean(0).mean(-1).mean(-1)
         
-        print("img: ", img.shape)
-        print("segs: ", segs.shape)
+        BATCH_SIZE = img.size(0)
+        
+        mean = (segs + 1).mean([2, 3]) # (B, CA)
+        
+        # print("img: ", img.shape)
+        # print("segs: ", segs.shape)
         
         if mean.sum() == 0:
             mean[0] = 1  # forward at least one segmentation
 
         # run encoder
-        enc_img = self.encoder_img(img)
-        enc_segs = list()
-        for i in range(segs.size(1)):
-            if mean[i] > 0:  # skip empty segmentation
-                seg = segs[:, i, :, :].unsqueeze(1)
-                enc_segs.append(self.encoder_seg(seg))
-        enc_segs = torch.cat(enc_segs)
-        enc_segs_sum = torch.sum(enc_segs, dim=0, keepdim=True)  # aggregated set feature
+        enc_img = self.encoder_img(img) # (B, ngf, w, h)
+        enc_segs_list = []
 
-        print("enc_img: ", enc_img.shape)
-        print("enc_segs: ", enc_segs.shape)
-        print("enc_segs_sum", enc_segs_sum.shape)
+        for b in range(BATCH_SIZE):
+            batch_segs = []
+            for i in range(segs.size(1)):
+                if mean[b, i] > 0:
+                    seg = segs[b:b+1, i:i+1, :, :]  # (1, 1, w, h)
+                    batch_segs.append(self.encoder_seg(seg))
+            
+            if not batch_segs: # no segments processed
+                seg = segs[b:b+1, 0:1, :, :]  # (1, 1, w, h)
+                batch_segs.append(self.encoder_seg(seg))
 
-        # run decoder
-        feat = torch.cat([enc_img, enc_segs_sum], dim=1)
-        print("feat: ", feat.shape)
+            batch_enc_segs = torch.cat(batch_segs, dim=0) # (n_segs, ngf, w, h)
+            batch_end_segs_sum = torch.sum(batch_enc_segs, dim=0, keepdim=True) # (1, ngf, w, h)
+            enc_segs_list.append(batch_end_segs_sum)
+
+        enc_segs_sum = torch.stack(enc_segs_list, dim=0)  # (B, ngf, w, h) 
+
+        feat = torch.cat([enc_img, enc_segs_sum], dim=1)  # (B, 2*ngf, w, h)
         out = [self.decoder_img(feat)]
-        idx = 0
-        for i in range(segs.size(1)):
-            if mean[i] > 0:
-                enc_seg = enc_segs[idx].unsqueeze(0)  # (1, ngf, w, h)
-                idx += 1  # move to next index
-                feat = torch.cat([enc_seg, enc_img, enc_segs_sum], dim=1)
-                out += [self.decoder_seg(feat)]
-            else:
-                out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
+        # for i in range(segs.size(1)):
+        #     if mean[i] > 0:  # skip empty segmentation
+        #         seg = segs[:, i, :, :].unsqueeze(1)
+        #         enc_segs.append(self.encoder_seg(seg))
+        # enc_segs = torch.cat(enc_segs)
+        # enc_segs_sum = torch.sum(enc_segs, dim=0, keepdim=True)  # aggregated set feature
+
+        # print("enc_img: ", enc_img.shape)
+        # print("enc_segs: ", enc_segs.shape)
+        # print("enc_segs_sum", enc_segs_sum.shape)
+
+        # # run decoder
+        # feat = torch.cat([enc_img, enc_segs_sum], dim=1)
+        # # print("feat: ", feat.shape)
+        # out = [self.decoder_img(feat)]
+        # idx = 0
+        # for i in range(segs.size(1)):
+        #     if mean[i] > 0:
+        #         enc_seg = enc_segs[idx].unsqueeze(0)  # (1, ngf, w, h)
+        #         idx += 1  # move to next index
+        #         feat = torch.cat([enc_seg, enc_img, enc_segs_sum], dim=1)
+        #         out += [self.decoder_seg(feat)]
+        #     else:
+        #         out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
+        
+        for b in range(BATCH_SIZE):
+            idx = 0
+            for i in range(segs.size(1)):
+                if mean[b, i] > 0:
+                    enc_seg = self.encoder_seg(segs[b:b+1, i:i+1, :, :])  # (1, ngf, w, h)
+                    feat = torch.cat([enc_seg, enc_img[b:b+1], enc_segs_sum[b:b+1]], dim=1)
+                    out.append(self.decoder_seg(feat))
+                    idx += 1
+                else:
+                    out.append(segs[b:b+1, i:i+1, :, :])
+
         return torch.cat(out, dim=1)
 
 
