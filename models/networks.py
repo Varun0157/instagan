@@ -324,7 +324,8 @@ class ResnetSetGenerator(nn.Module):
             batch_end_segs_sum = torch.sum(batch_enc_segs, dim=0, keepdim=True) # (1, ngf, w, h)
             enc_segs_list.append(batch_end_segs_sum)
 
-        enc_segs_sum = torch.stack(enc_segs_list, dim=0)  # (B, ngf, w, h) 
+        enc_segs_sum = torch.stack(enc_segs_list, dim=0)  # (B, 1, ngf, w, h)
+        enc_segs_sum = enc_segs_sum.squeeze(1)  # (B, ngf, w, h) 
 
         print("enc_img: ", enc_img.shape)   
         print("enc_segs_sum: ", enc_segs_sum.shape)
