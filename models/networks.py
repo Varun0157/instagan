@@ -299,8 +299,8 @@ class ResnetSetGenerator(nn.Module):
         
         mean = (segs + 1).mean([2, 3]) # (B, CA)
         
-        # print("img: ", img.shape)
-        # print("segs: ", segs.shape)
+        print("img: ", img.shape)
+        print("segs: ", segs.shape)
         
         if mean.sum() == 0:
             mean[0] = 1  # forward at least one segmentation
@@ -326,7 +326,10 @@ class ResnetSetGenerator(nn.Module):
 
         enc_segs_sum = torch.stack(enc_segs_list, dim=0)  # (B, ngf, w, h) 
 
+        print("enc_img: ", enc_img.shape)   
+        print("enc_segs_sum: ", enc_segs_sum.shape)
         feat = torch.cat([enc_img, enc_segs_sum], dim=1)  # (B, 2*ngf, w, h)
+        print("feat: ", feat.shape)
         out = [self.decoder_img(feat)]
         # for i in range(segs.size(1)):
         #     if mean[i] > 0:  # skip empty segmentation
