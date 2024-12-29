@@ -296,6 +296,7 @@ class ResnetSetGenerator(nn.Module):
         segs = inp[:, self.input_nc:, :, :]  # (B, CA, W, H)
         
         BATCH_SIZE = img.size(0)
+        NUM_SEGS = segs.size(1)
         
         mean = (segs + 1).mean([2, 3]) # (B, CA)
         
@@ -357,16 +358,19 @@ class ResnetSetGenerator(nn.Module):
         #     else:
         #         out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
         
-        for b in range(BATCH_SIZE):
-            idx = 0
-            for i in range(segs.size(1)):
+        for i in range(NUM_SEGS):
+            batch_seg_outputs = []
+            for b in range(BATCH_SIZE):
                 if mean[b, i] > 0:
                     enc_seg = self.encoder_seg(segs[b:b+1, i:i+1, :, :])  # (1, ngf, w, h)
                     feat = torch.cat([enc_seg, enc_img[b:b+1], enc_segs_sum[b:b+1]], dim=1)
-                    out.append(self.decoder_seg(feat))
-                    idx += 1
+                    seg_opt = self.decoder_seg(feat)
                 else:
-                    out.append(segs[b:b+1, i:i+1, :, :])
+                    seg_opt = segs[b:b+1, i:i+1, :, :]
+                batch_seg_outputs.append(seg_opt)
+            
+            seg_output = torch.cat(batch_seg_outputs, dim=0)
+            out.append(seg_output)
 
         for item in out:
             print(item.shape)
