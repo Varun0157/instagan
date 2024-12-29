@@ -314,6 +314,7 @@ class ResnetSetGenerator(nn.Module):
 
         print("enc_img: ", enc_img.shape)
         print("enc_segs: ", enc_segs.shape)
+        print("enc_segs_sum", enc_segs_sum.shape)
 
         # run decoder
         feat = torch.cat([enc_img, enc_segs_sum], dim=1)
