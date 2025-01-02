@@ -32,7 +32,7 @@ class InstaGANModel(BaseModel):
 		self.ins_iter = self.opt.ins_max // self.opt.ins_per  # number of forward iteration
 
 		# specify the training losses you want to print out. The program will call base_model.get_current_losses
-		self.loss_names = ['D_A', 'G_A', 'cyc_A', 'idt_A', 'ctx_A', 'D_B', 'G_B', 'cyc_B', 'idt_B', 'ctx_B']
+		self.loss_names = ['D_A', 'G_A', 'cyc_A', 'idt_A', 'ctx_A', 'D_B', 'G_B', 'cyc_B', 'idt_B', 'ctx_B', 'G']
 		# specify the images you want to save/display. The program will call base_model.get_current_visuals
 		visual_names_A_img = ['real_A_img', 'fake_B_img', 'rec_A_img']
 		visual_names_B_img = ['real_B_img', 'fake_A_img', 'rec_B_img']
@@ -289,6 +289,7 @@ class InstaGANModel(BaseModel):
 					self.backward_D_A()
 				if self.forward_B:
 					self.backward_D_B()
+				
 				self.optimizer_D.step()
 
 			# update setting for next iteration
