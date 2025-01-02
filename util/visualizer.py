@@ -9,6 +9,10 @@ from . import html
 # from scipy.misc import imresize
 from PIL import Image
 
+import wandb
+
+wandb.init(project="instagan")
+
 if sys.version_info[0] == 2:
     VisdomExceptionBase = Exception
 else:
@@ -213,6 +217,7 @@ class Visualizer:
         )
         for k, v in losses.items():
             message += "%s: %.3f " % (k, v)
+            wandb.log({k: v})
 
         print(message)
         with open(self.log_name, "a") as log_file:
