@@ -487,27 +487,34 @@ class ResnetSetGenerator(nn.Module):
         enc_segs_sum = enc_segs_sum.squeeze(1)  # (B, ngf, w, h)
 
         # run decoder
-        feat = torch.cat([enc_img, enc_segs_sum], dim=1)  # (B, 2*ngf, w, h)
-        out = [self.decoder_img(feat)]
+        out = []
 
-        for s in range(NUM_SEGS):
+        for b in range(BATCH_SIZE):
+            enc_img_batch = enc_img[b].unsqueeze(0)  # (1, ngf, w, h)
+            enc_segs_sum_batch = enc_segs_sum[b].unsqueeze(0)  # (1, ngf, w, h)
+
+            feat = torch.cat(
+                [enc_img_batch, enc_segs_sum_batch], dim=1
+            )  # (1, 2*ngf, w, h)
+            batch_out = [self.decoder_img(feat)]
             idx = 0
-            batch_seg_outputs = []
-            for b in range(BATCH_SIZE):
+
+            for s in range(NUM_SEGS):
                 if mean[b, s] > 0:
-                    enc_seg = enc_segs_list[b][idx : idx + 1]
+                    enc_seg = enc_segs_list[b][idx].unsqueeze(0)  # (1, ngf, w, h)
                     idx += 1
 
-                    feat = torch.cat([enc_seg, enc_img, enc_segs_sum], dim=1)
-                    seg_opt = self.decoder_seg(feat)
+                    feat = torch.cat([enc_seg, enc_img_batch, enc_segs_sum], dim=1)
+                    batch_out += [self.decoder_seg(feat)]
                 else:
-                    seg_opt = segs[b : b + 1, s : s + 1, :, :]
-                batch_seg_outputs.append(seg_opt)
+                    batch_out += [segs[b, s, :, :].unsqueeze(1)]
 
-            seg_output = torch.cat(batch_seg_outputs, dim=0)
-            out.append(seg_output)
+            out += torch.cat(batch_out, dim=1)
 
-        return torch.cat(out, dim=1)
+        out = torch.cat(out, dim=1)
+        print(out.shape)
+
+        return out
 
 
 # Define a resnet block
