@@ -505,7 +505,10 @@ class ResnetSetGenerator(nn.Module):
             batch_out = torch.cat(batch_out, dim=1)
             print("batch_out: ", batch_out.shape)
 
-            out += batch_out
+            out.append(batch_out)
+
+        print("out: ", len(out))
+        print("out[0]: ", out[0].shape)
 
         out = torch.cat(out, dim=1)
         print(out.shape)
