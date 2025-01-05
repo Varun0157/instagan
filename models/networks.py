@@ -502,7 +502,10 @@ class ResnetSetGenerator(nn.Module):
             feat = torch.cat([enc_seg, enc_img_batch, enc_segs_sum_batch], dim=1)
             batch_out += [self.decoder_seg(feat)]
 
-            out += torch.cat(batch_out, dim=1)
+            batch_out = torch.cat(batch_out, dim=1)
+            print("batch_out: ", batch_out.shape)
+
+            out += batch_out
 
         out = torch.cat(out, dim=1)
         print(out.shape)
