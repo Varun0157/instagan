@@ -452,19 +452,17 @@ class ResnetSetGenerator(nn.Module):
         model += [nn.Tanh()]
         return nn.Sequential(*model)
 
-    def forward(self, inp):
+    def forward(self, inp, log_shapes=True):
         # split data
         # NOTE: makes the assumption of single instance (that is all that matters for our use case)
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
-        print("img: ", img.shape)
+        if log_shapes:
+            print("img: ", img.shape)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
-        print("seg: ", segs.shape)
+        if log_shapes:
+            print("seg: ", segs.shape)
 
         BATCH_SIZE = segs.size(0)
-
-        NUM_SEGS = segs.size(1)
-        if NUM_SEGS > 1:
-            print("warning: more than one seg mask found")
 
         # mean = (segs + 1).mean([2, 3])  # (B, CA)
 
@@ -481,15 +479,18 @@ class ResnetSetGenerator(nn.Module):
             enc_segs.append(self.encoder_seg(seg))
 
         enc_segs = torch.cat(enc_segs)
-        print("enc_segs: ", enc_segs.shape)
+        if log_shapes:
+            print("enc_segs: ", enc_segs.shape)
 
         # run decoder
         out = []
         for b in range(BATCH_SIZE):
             enc_img_batch = enc_img[b].unsqueeze(0)  # (1, ngf, w, h)
-            print("enc_img_batch: ", enc_img_batch.shape)
+            if log_shapes:
+                print("enc_img_batch: ", enc_img_batch.shape)
             enc_segs_sum_batch = enc_segs[b].unsqueeze(0)  # (1, ngf, w, h)
-            print("enc_seg_sum_batch: ", enc_segs_sum_batch.shape)
+            if log_shapes:
+                print("enc_seg_sum_batch: ", enc_segs_sum_batch.shape)
 
             feat = torch.cat(
                 [enc_img_batch, enc_segs_sum_batch], dim=1
@@ -497,21 +498,25 @@ class ResnetSetGenerator(nn.Module):
             batch_out = [self.decoder_img(feat)]
 
             enc_seg = enc_segs[b].unsqueeze(0)  # (1, ngf, w, h)
-            print("enc_seg: ", enc_seg.shape)
+            if log_shapes:
+                print("enc_seg: ", enc_seg.shape)
 
             feat = torch.cat([enc_seg, enc_img_batch, enc_segs_sum_batch], dim=1)
             batch_out += [self.decoder_seg(feat)]
 
             batch_out = torch.cat(batch_out, dim=1)
-            print("batch_out: ", batch_out.shape)
+            if log_shapes:
+                print("batch_out: ", batch_out.shape)
 
             out.append(batch_out)
 
-        print("out: ", len(out))
-        print("out[0]: ", out[0].shape)
+        if log_shapes:
+            print("out: ", len(out))
+            print("out[0]: ", out[0].shape)
 
         out = torch.cat(out)
-        print(out.shape)
+        if log_shapes:
+            print(out.shape)
 
         return out
 
