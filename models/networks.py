@@ -463,12 +463,7 @@ class ResnetSetGenerator(nn.Module):
         # run encoder
         enc_img = self.encoder_img(img)  # (B, ngf, w, h)
         # ngf -> number of generator features
-        enc_segs = []
-        for b in range(BATCH_SIZE):
-            seg = segs[b : b + 1, :1, :, :]  # (1, 1, w, h)
-            enc_segs.append(self.encoder_seg(seg))
-
-        enc_segs = torch.cat(enc_segs)
+        enc_segs = self.encoder_seg(segs)  # (B, ?, w, h)
 
         # run decoder
         out = []
