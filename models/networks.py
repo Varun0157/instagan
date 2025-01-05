@@ -510,7 +510,7 @@ class ResnetSetGenerator(nn.Module):
         print("out: ", len(out))
         print("out[0]: ", out[0].shape)
 
-        out = torch.cat(out, dim=1)
+        out = torch.cat(out)
         print(out.shape)
 
         return out
