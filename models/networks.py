@@ -453,29 +453,25 @@ class ResnetSetGenerator(nn.Module):
         return nn.Sequential(*model)
 
     def forward(self, inp):
-        # split data
         # NOTE: makes the assumption of single instance (that is all that matters for our use case)
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
 
         # run encoder
         enc_img = self.encoder_img(img)  # (B, ngf, w, h)
-        # ngf -> number of generator features
         enc_segs = self.encoder_seg(segs)  # (B, ngf, w, h)
+        # ngf -> number of generator features
 
         # run decoder
         image_encoding = torch.cat([enc_img, enc_segs], dim=1)  # (B, 2*ngf, w, h)
-        print("image encoding: ", image_encoding.shape)
         decoded_imgs = self.decoder_img(image_encoding)  # (B, CX, w, h)
 
         seg_encoding = torch.cat(
             [enc_segs, enc_img, enc_segs], dim=1
         )  # (B, 3*ngf, w, h)
-        print("seg encoding: ", seg_encoding.shape)
         decoded_segs = self.decoder_seg(seg_encoding)  # (B, CA, w, h)
 
         out = torch.cat([decoded_imgs, decoded_segs], dim=1)  # (B, CX+CA, w, h)
-        print(out.shape)
 
         return out
 
