@@ -454,21 +454,23 @@ class ResnetSetGenerator(nn.Module):
 
     def forward(self, inp):
         # NOTE: makes the assumption of single instance (that is all that matters for our use case)
+        # NOTE: CX = 3 (RGB channels), CA = 1 (single segmentation)
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
 
-        # run encoder
-        enc_img = self.encoder_img(img)  # (B, ngf, w, h)
-        enc_segs = self.encoder_seg(segs)  # (B, ngf, w, h)
-        # ngf -> number of generator features
+        # encoder
+        enc_img = self.encoder_img(img)  # (B, emb_dim_img, w, h)
+        enc_segs = self.encoder_seg(segs)  # (B, emb_dim_seg, w, h)
 
-        # run decoder
-        image_encoding = torch.cat([enc_img, enc_segs], dim=1)  # (B, 2*ngf, w, h)
+        # decoder
+        image_encoding = torch.cat(
+            [enc_img, enc_segs], dim=1
+        )  # (B, emb_dim_img + emb_dim_seg, w, h)
         decoded_imgs = self.decoder_img(image_encoding)  # (B, CX, w, h)
 
         seg_encoding = torch.cat(
             [enc_segs, enc_img, enc_segs], dim=1
-        )  # (B, 3*ngf, w, h)
+        )  # (B, 2*emb_dim_seg + emb_dim_img, w, h)
         decoded_segs = self.decoder_seg(seg_encoding)  # (B, CA, w, h)
 
         out = torch.cat([decoded_imgs, decoded_segs], dim=1)  # (B, CX+CA, w, h)
