@@ -456,7 +456,9 @@ class ResnetSetGenerator(nn.Module):
         # split data
         # NOTE: makes the assumption of single instance (that is all that matters for our use case)
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
+        print("img: ", img.shape)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
+        print("seg: ", segs.shape)
 
         BATCH_SIZE = segs.size(0)
 
@@ -472,23 +474,19 @@ class ResnetSetGenerator(nn.Module):
         # run encoder
         enc_img = self.encoder_img(img)  # (B, ngf, w, h)
         # ngf -> number of generator features
-        enc_segs_list = []
+        enc_segs = []
 
         for b in range(BATCH_SIZE):
             seg = segs[b : b + 1, :1, :, :]  # (1, 1, w, h)
-            batch_segs = [self.encoder_seg(seg)]
-
-            enc_segs_list.append(batch_segs)
-
-        enc_segs_sum = torch.stack(enc_segs_list, dim=0)  # (B, 1, ngf, w, h)
-        enc_segs_sum = enc_segs_sum.squeeze(1)  # (B, ngf, w, h)
+            enc_segs.append(self.encoder_seg(seg))
+        print("enc_segs_list: ", len(enc_segs))
+        print("enc_segs_list[0]: ", enc_segs[0].shape)
 
         # run decoder
         out = []
-
         for b in range(BATCH_SIZE):
             enc_img_batch = enc_img[b].unsqueeze(0)  # (1, ngf, w, h)
-            enc_segs_sum_batch = enc_segs_sum[b].unsqueeze(0)  # (1, ngf, w, h)
+            enc_segs_sum_batch = enc_segs[b].unsqueeze(0)  # (1, ngf, w, h)
 
             feat = torch.cat(
                 [enc_img_batch, enc_segs_sum_batch], dim=1
