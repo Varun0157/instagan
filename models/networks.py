@@ -452,7 +452,7 @@ class ResnetSetGenerator(nn.Module):
         model += [nn.Tanh()]
         return nn.Sequential(*model)
 
-    def forward(self, inp, log_shapes=True):
+    def forward(self, inp, log_shapes=False):
         # split data
         # NOTE: makes the assumption of single instance (that is all that matters for our use case)
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
