@@ -479,8 +479,10 @@ class ResnetSetGenerator(nn.Module):
         for b in range(BATCH_SIZE):
             seg = segs[b : b + 1, :1, :, :]  # (1, 1, w, h)
             enc_segs.append(self.encoder_seg(seg))
-        print("enc_segs_list: ", len(enc_segs))
-        print("enc_segs_list[0]: ", enc_segs[0].shape)
+        print("enc_segs: ", len(enc_segs))
+        print("enc_segs[0]: ", enc_segs[0].shape)
+
+        enc_segs = torch.cat(enc_segs, dim=0)
 
         # run decoder
         out = []
@@ -493,9 +495,9 @@ class ResnetSetGenerator(nn.Module):
             )  # (1, 2*ngf, w, h)
             batch_out = [self.decoder_img(feat)]
 
-            enc_seg = enc_segs_list[b]  # (1, ngf, w, h)
+            enc_seg = enc_segs[b]  # (1, ngf, w, h)
 
-            feat = torch.cat([enc_seg, enc_img_batch, enc_segs_sum], dim=1)
+            feat = torch.cat([enc_seg, enc_img_batch, enc_segs], dim=1)
             batch_out += [self.decoder_seg(feat)]
 
             out += torch.cat(batch_out, dim=1)
