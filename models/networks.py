@@ -458,32 +458,24 @@ class ResnetSetGenerator(nn.Module):
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
 
-        BATCH_SIZE = segs.size(0)
-
         # run encoder
         enc_img = self.encoder_img(img)  # (B, ngf, w, h)
         # ngf -> number of generator features
-        enc_segs = self.encoder_seg(segs)  # (B, ?, w, h)
+        enc_segs = self.encoder_seg(segs)  # (B, ngf, w, h)
 
         # run decoder
-        out = []
-        for b in range(BATCH_SIZE):
-            enc_img_batch = enc_img[b].unsqueeze(0)  # (1, ngf, w, h)
-            enc_segs_sum_batch = enc_segs[b].unsqueeze(0)  # (1, ngf, w, h)
+        image_encoding = torch.cat([enc_img, enc_segs], dim=1)  # (B, 2*ngf, w, h)
+        print("image encoding: ", image_encoding.shape)
+        decoded_imgs = self.decoder_img(image_encoding)  # (B, CX, w, h)
 
-            feat = torch.cat(
-                [enc_img_batch, enc_segs_sum_batch], dim=1
-            )  # (1, 2*ngf, w, h)
-            batch_out = [self.decoder_img(feat)]
-            enc_seg = enc_segs[b].unsqueeze(0)  # (1, ngf, w, h)
+        seg_encoding = torch.cat(
+            [enc_segs, enc_img, enc_segs], dim=1
+        )  # (B, 3*ngf, w, h)
+        print("seg encoding: ", seg_encoding.shape)
+        decoded_segs = self.decoder_seg(seg_encoding)  # (B, CA, w, h)
 
-            feat = torch.cat([enc_seg, enc_img_batch, enc_segs_sum_batch], dim=1)
-            batch_out += [self.decoder_seg(feat)]
-            batch_out = torch.cat(batch_out, dim=1)
-
-            out.append(batch_out)
-
-        out = torch.cat(out)
+        out = torch.cat([decoded_imgs, decoded_segs], dim=1)  # (B, CX+CA, w, h)
+        print(out.shape)
 
         return out
 
