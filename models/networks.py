@@ -350,7 +350,7 @@ class ResnetSetGenerator(nn.Module):
         self.input_nc = input_nc
         self.output_nc = output_nc
         self.ngf = ngf
-        if type(norm_layer) == functools.partial:
+        if type(norm_layer) is functools.partial:
             use_bias = norm_layer.func == nn.InstanceNorm2d
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
@@ -454,12 +454,17 @@ class ResnetSetGenerator(nn.Module):
 
     def forward(self, inp):
         # split data
+        # NOTE: makes the assumption of single instance (that is all that matters for our use case)
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
 
-        BATCH_SIZE, NUM_SEGS, _, _ = segs.size()
+        BATCH_SIZE = segs.size(0)
 
-        mean = (segs + 1).mean([2, 3])  # (B, CA)
+        NUM_SEGS = segs.size(1)
+        if NUM_SEGS > 1:
+            print("warning: more than one seg mask found")
+
+        # mean = (segs + 1).mean([2, 3])  # (B, CA)
 
         # if mean.sum() == 0:
         #     mean[0] = 1  # forward at least one segmentation
@@ -470,18 +475,10 @@ class ResnetSetGenerator(nn.Module):
         enc_segs_list = []
 
         for b in range(BATCH_SIZE):
-            batch_segs = []
-            for s in range(segs.size(1)):
-                if mean[b, s] > 0:
-                    seg = segs[b : b + 1, s : s + 1, :, :]  # (1, 1, w, h)
-                    batch_segs.append(self.encoder_seg(seg))
+            seg = segs[b : b + 1, :1, :, :]  # (1, 1, w, h)
+            batch_segs = [self.encoder_seg(seg)]
 
-            batch_enc_segs = torch.cat(batch_segs, dim=0)  # (n_segs, ngf, w, h)
-            batch_end_segs_sum = torch.sum(
-                batch_enc_segs, dim=0, keepdim=True
-            )  # (1, ngf, w, h)
-
-            enc_segs_list.append(batch_end_segs_sum)
+            enc_segs_list.append(batch_segs)
 
         enc_segs_sum = torch.stack(enc_segs_list, dim=0)  # (B, 1, ngf, w, h)
         enc_segs_sum = enc_segs_sum.squeeze(1)  # (B, ngf, w, h)
@@ -497,17 +494,11 @@ class ResnetSetGenerator(nn.Module):
                 [enc_img_batch, enc_segs_sum_batch], dim=1
             )  # (1, 2*ngf, w, h)
             batch_out = [self.decoder_img(feat)]
-            idx = 0
 
-            for s in range(NUM_SEGS):
-                if mean[b, s] > 0:
-                    enc_seg = enc_segs_list[b][idx].unsqueeze(0)  # (1, ngf, w, h)
-                    idx += 1
+            enc_seg = enc_segs_list[b]  # (1, ngf, w, h)
 
-                    feat = torch.cat([enc_seg, enc_img_batch, enc_segs_sum], dim=1)
-                    batch_out += [self.decoder_seg(feat)]
-                else:
-                    batch_out += [segs[b, s, :, :].unsqueeze(1)]
+            feat = torch.cat([enc_seg, enc_img_batch, enc_segs_sum], dim=1)
+            batch_out += [self.decoder_seg(feat)]
 
             out += torch.cat(batch_out, dim=1)
 
