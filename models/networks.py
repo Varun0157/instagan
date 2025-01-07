@@ -821,8 +821,6 @@ class NLayerSetDiscriminator(nn.Module):
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
 
-        print(img.shape, segs.shape)
-
         mean = (segs + 1).mean(0).mean(-1).mean(-1)
         if mean.sum() == 0:
             mean[0] = 1  # forward at least one segmentation
@@ -841,8 +839,6 @@ class NLayerSetDiscriminator(nn.Module):
         # run classifier
         feat = torch.cat([feat_img, feat_segs_sum], dim=1)
         out = self.classifier(feat)
-
-        print(out.shape)
 
         return out
 
