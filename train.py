@@ -13,7 +13,7 @@ if __name__ == "__main__":
     print("#training images = %d" % dataset_size)
 
     model = create_model(opt)
-    assert type(model) == InstaGANModel  # to make type checking easier
+    assert type(model) is InstaGANModel  # to make type checking easier
 
     model.setup(opt)
     visualizer = Visualizer(opt)
