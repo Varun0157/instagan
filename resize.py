@@ -44,6 +44,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     directory = sys.argv[1]
-    target_size = (180, 320)  # Fixed resolution
+    target_size = (320, 180)  # Fixed resolution
 
     resize_images(directory, target_size)
