@@ -37,14 +37,13 @@ class UnalignedSegDataset(BaseDataset):
         segs = list()
         for i in range(self.max_instances):
             path = seg_path.replace(".png", "_{}.png".format(i))
-            print("path: ", path)
             if os.path.isfile(path):
                 seg = Image.open(path).convert("RGB")
                 seg = self.fixed_transform(seg, seed)
                 segs.append(seg)
             else:
-                print("path not found: ", path)
-                segs.append(-torch.ones(segs[0].size()))
+                # NOTE: 3 for RGB
+                segs.append(-torch.ones((3, self.opt.fineSizeW, self.opt.fineSizeH)))
         return torch.cat(segs)
 
     def __getitem__(self, index):
