@@ -18,7 +18,7 @@ def main():
         sys.exit(1)
 
     # Get the list of image files (assumes files are named 1.png, 2.png, etc.)
-    images = [f for f in os.listdir(base_dir) if f.endswith(".png") and f.isdigit()]
+    images = [f for f in os.listdir(base_dir) if f.endswith(".png")]
     images.sort(key=lambda x: int(os.path.splitext(x)[0]))  # Sort numerically
 
     if len(images) < 50:
