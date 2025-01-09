@@ -43,7 +43,7 @@ class UnalignedSegDataset(BaseDataset):
                 segs.append(seg)
             else:
                 # NOTE: 3 for RGB
-                segs.append(-torch.ones((3, self.opt.fineSizeW, self.opt.fineSizeH)))
+                segs.append(-torch.ones((3, self.opt.fineSizeH, self.opt.fineSizeW)))
         return torch.cat(segs)
 
     def __getitem__(self, index):
