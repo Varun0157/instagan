@@ -42,6 +42,7 @@ class UnalignedSegDataset(BaseDataset):
                 seg = self.fixed_transform(seg, seed)
                 segs.append(seg)
             else:
+                print("path: ", path)
                 segs.append(-torch.ones(segs[0].size()))
         return torch.cat(segs)
 
