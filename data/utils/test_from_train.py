@@ -36,7 +36,8 @@ def main():
     # Move the selected images to the new directories
     for img in selected_images:
         base_img_path = os.path.join(base_dir, img)
-        seg_img_path = os.path.join(base_seg_dir, img)
+        filename, ext = os.path.splitext(img)
+        seg_img_path = os.path.join(base_seg_dir, f"{filename}_0{ext}")
 
         new_img_path = os.path.join(new_dir, img)
         new_seg_img_path = os.path.join(new_seg_dir, img)
