@@ -1,4 +1,5 @@
 import os
+import random
 import shutil
 import sys
 
@@ -25,7 +26,7 @@ def main():
         sys.exit(1)
 
     # Select 50 random images
-    selected_images = images[len(images) - 50 :]
+    selected_images = random.sample(images, 50)
 
     # Create new directories if they do not exist
     new_dir = os.path.join(base_dir, "new")
