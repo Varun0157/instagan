@@ -30,8 +30,11 @@ def clean_subdir(
 
         try:
             with Image.open(input_path) as img:
-                img_resized = img.resize(target_size, Image.Resampling.LANCZOS)
-                img_resized.save(output_path)
+                out = img.resize(target_size, Image.Resampling.LANCZOS)
+                if seg:
+                    out = out.convert("L")
+
+                out.save(output_path)
                 print(f"resized and saved: {in_file} -> {out_file}")
         except Exception as e:
             print(f"error processing {in_file}: {e}")
