@@ -5,7 +5,9 @@ import ntpath
 import time
 from . import util
 from . import html
-from scipy.misc import imresize
+
+# from scipy.misc import imresize
+from PIL import Image
 
 import wandb
 
@@ -31,11 +33,21 @@ def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
         image_name = "%s_%s.png" % (name, label)
         save_path = os.path.join(image_dir, image_name)
         h, w, _ = im.shape
+
+        # if aspect_ratio > 1.0:
+        #     im = imresize(im, (h, int(w * aspect_ratio)), interp="bicubic")
+        # if aspect_ratio < 1.0:
+        #     im = imresize(im, (int(h / aspect_ratio), w), interp="bicubic")
+        # util.save_image(im, save_path)
+
+        im_pil = Image.fromarray(im)
         if aspect_ratio > 1.0:
-            im = imresize(im, (h, int(w * aspect_ratio)), interp="bicubic")
-        if aspect_ratio < 1.0:
-            im = imresize(im, (int(h / aspect_ratio), w), interp="bicubic")
-        util.save_image(im, save_path)
+            new_width = int(w * aspect_ratio)
+            im_pil = im_pil.resize((new_width, h), resample=Image.Resampling.BICUBIC)
+        elif aspect_ratio < 1.0:
+            new_height = int(h / aspect_ratio)
+            im_pil = im_pil.resize((w, new_height), resample=Image.Resampling.BICUBIC)
+        im_pil.save(save_path)
 
         ims.append(image_name)
         txts.append(label)
