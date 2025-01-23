@@ -453,38 +453,25 @@ class ResnetSetGenerator(nn.Module):
         return nn.Sequential(*model)
 
     def forward(self, inp):
-        # split data
+        # NOTE: assumption of single instance
+        # CX = 3 (RGB), CA = 1 (segmentation)
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
-        mean = (segs + 1).mean(0).mean(-1).mean(-1)
-        if mean.sum() == 0:
-            mean[0] = 1  # forward at least one segmentation
 
-        # run encoder
-        enc_img = self.encoder_img(img)
-        enc_segs = list()
-        for i in range(segs.size(1)):
-            if mean[i] > 0:  # skip empty segmentation
-                seg = segs[:, i, :, :].unsqueeze(1)
-                enc_segs.append(self.encoder_seg(seg))
-        enc_segs = torch.cat(enc_segs)
-        enc_segs_sum = torch.sum(
-            enc_segs, dim=0, keepdim=True
-        )  # aggregated set feature
+        # encder
+        enc_img = self.encoder_img(img)  # (B, ngf, W, H)
+        enc_segs = self.encoder_seg(segs)  # (B, ngf, W, H)
 
-        # run decoder
-        feat = torch.cat([enc_img, enc_segs_sum], dim=1)
-        out = [self.decoder_img(feat)]
-        idx = 0
-        for i in range(segs.size(1)):
-            if mean[i] > 0:
-                enc_seg = enc_segs[idx].unsqueeze(0)  # (1, ngf, w, h)
-                idx += 1  # move to next index
-                feat = torch.cat([enc_seg, enc_img, enc_segs_sum], dim=1)
-                out += [self.decoder_seg(feat)]
-            else:
-                out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
-        return torch.cat(out, dim=1)
+        # decoder
+        img_feat = torch.cat([enc_img, enc_segs], dim=1)  # (B, 2*ngf, W, H)
+        decoded_img = self.decoder_img(img_feat)  # (B, CX, W, H)
+
+        seg_feat = torch.cat([enc_segs, enc_img, enc_segs], dim=1)  # (B, 3*ngf, W, H)
+        decoded_seg = self.decoder_seg(seg_feat)  # (B, CA, W, H)
+
+        out = torch.cat([decoded_img, decoded_seg], dim=1)  # (B, CX+CA, W, H)
+
+        return out
 
 
 # Define a resnet block
