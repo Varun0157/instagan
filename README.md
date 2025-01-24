@@ -1,3 +1,6 @@
+# TODO 
+- [ ] init wandb only for the train runs instead of a global init
+
 # InstaGAN: Instance-aware Image-to-Image Translation
 
 **Warning:** This repo contains a model which has potential ethical concerns. Remark that the task of jeans<->skirt was a bad application and should not be used in future research. See the [twitter thread](https://twitter.com/SashaMTL/status/1453491661720391685) for the discussion.
