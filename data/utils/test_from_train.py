@@ -62,3 +62,7 @@ def main():
         train_dir = os.path.join(dataset, dir)
         test_dir = os.path.join(dataset, dir.replace("train", "test"))
         create_test(train_dir, test_dir)
+
+
+if __name__ == "__main__":
+    main()
