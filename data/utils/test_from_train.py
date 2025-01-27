@@ -40,7 +40,7 @@ def create_test(train_dir: str, test_dir: str, sample_num: int = 50):
         test_img_path = os.path.join(test_dir, img)
         test_seg_path = os.path.join(test_seg_dir, seg_img_path)
 
-        if os.path.exists(train_img_path) and os.path.exists(seg_img_path):
+        if os.path.exists(train_img_path) and os.path.exists(train_seg_path):
             shutil.move(train_img_path, test_img_path)
             print(f"{train_img_path} -> {test_img_path}")
 
