@@ -5,6 +5,8 @@ import sys
 
 
 def create_test(train_dir: str, test_dir: str, sample_num: int = 50):
+    print(train_dir, test_dir, sample_num)
+
     train_seg_dir = train_dir + "_seg"
 
     if not os.path.exists(train_dir) or not os.path.exists(train_seg_dir):
@@ -25,6 +27,9 @@ def create_test(train_dir: str, test_dir: str, sample_num: int = 50):
     os.makedirs(test_dir, exist_ok=True)
     test_seg_dir = test_dir + "_seg"
     os.makedirs(test_seg_dir, exist_ok=True)
+
+    print(test_dir, test_seg_dir)
+    print(len(selected_images))
 
     for img in selected_images:
         train_img_path = os.path.join(train_dir, img)
