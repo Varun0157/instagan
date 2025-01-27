@@ -37,7 +37,10 @@ def create_test(train_dir: str, test_dir: str, sample_num: int = 50):
 
         if os.path.exists(train_img_path) and os.path.exists(seg_img_path):
             shutil.move(train_img_path, test_img_path)
+            print(f"{train_img_path} -> {test_img_path}")
+
             shutil.move(train_seg_path, test_seg_path)
+            print(f"{train_seg_path} -> {test_seg_path}")
         else:
             print(
                 f"warning: corresponding image {img} not found in both directories. skipping."
