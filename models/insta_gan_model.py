@@ -403,7 +403,7 @@ class InstaGANModel(BaseModel):
         )
         self.loss_G.backward()
 
-    def backward_D_basic(self, netD, real, fake, lr: float):
+    def backward_D_basic(self, netD, real, fake, lbda_d: float):
         # Real
         pred_real = netD(real)
         loss_D_real = self.criterionGAN(pred_real, True)
@@ -411,21 +411,21 @@ class InstaGANModel(BaseModel):
         pred_fake = netD(fake.detach())
         loss_D_fake = self.criterionGAN(pred_fake, False)
         # Combined loss
-        loss_D = lr * (loss_D_real + loss_D_fake) * 0.5
+        loss_D = lbda_d * (loss_D_real + loss_D_fake) * 0.5
         # backward
         loss_D.backward()
         return loss_D
 
-    def backward_D_A(self, lr: float):
+    def backward_D_A(self, lbda_d: float):
         fake_B = self.fake_B_pool.query(self.fake_B_mul)
-        self.loss_D_A = self.backward_D_basic(self.netD_A, self.real_B, fake_B, lr)
+        self.loss_D_A = self.backward_D_basic(self.netD_A, self.real_B, fake_B, lbda_d)
 
-    def backward_D_B(self, lr: float):
+    def backward_D_B(self, lbda_d: float):
         fake_A = self.fake_A_pool.query(self.fake_A_mul)
-        self.loss_D_B = self.backward_D_basic(self.netD_B, self.real_A, fake_A, lr)
+        self.loss_D_B = self.backward_D_basic(self.netD_B, self.real_A, fake_A, lbda_d)
 
     def optimize_parameters(self, epoch: int, total_epochs: int):
-        def lr_d() -> float:
+        def loss_weight_d() -> float:
             return 0.0 if (epoch < total_epochs // 2) else 1.0
 
         # init setting
@@ -453,9 +453,9 @@ class InstaGANModel(BaseModel):
                 self.set_requires_grad([self.netD_A, self.netD_B], True)
                 self.optimizer_D.zero_grad()
                 if self.forward_A:
-                    self.backward_D_A(lr_d())
+                    self.backward_D_A(loss_weight_d())
                 if self.forward_B:
-                    self.backward_D_B(lr_d())
+                    self.backward_D_B(loss_weight_d())
                 self.optimizer_D.step()
 
             # update setting for next iteration
