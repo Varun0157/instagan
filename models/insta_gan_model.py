@@ -401,6 +401,18 @@ class InstaGANModel(BaseModel):
             + self.loss_ctx_A
             + self.loss_ctx_B
         )
+
+        lambda_ridge = 1e-2
+        l2_reg = 0.0
+        for net in [self.netG_A, self.netG_B]:
+            for param in net.parameters():
+                if not param.requires_grad:
+                    continue
+                l2_reg += torch.norm(param)
+        l2_reg *= lambda_ridge
+
+        self.loss_G += l2_reg
+
         self.loss_G.backward()
 
     def backward_D_basic(self, netD, real, fake):
