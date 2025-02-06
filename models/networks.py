@@ -756,15 +756,15 @@ class NLayerSetDiscriminator(nn.Module):
 
         kw = 4
         padw = 1
-        self.feature_img = self.get_feature_extractor(
-            input_nc, ndf, n_layers, kw, padw, norm_layer, use_bias
-        )
+        # self.feature_img = self.get_feature_extractor(
+        #     input_nc, ndf, n_layers, kw, padw, norm_layer, use_bias
+        # )
         self.feature_seg = self.get_feature_extractor(
             1, ndf, n_layers, kw, padw, norm_layer, use_bias
         )
         self.classifier = self.get_classifier(
-            2 * ndf, n_layers, kw, padw, norm_layer, use_sigmoid
-        )  # 2*ndf
+            ndf, n_layers, kw, padw, norm_layer, use_sigmoid
+        )
 
     def get_feature_extractor(
         self, input_nc, ndf, n_layers, kw, padw, norm_layer, use_bias
@@ -834,7 +834,7 @@ class NLayerSetDiscriminator(nn.Module):
             mean[0] = 1  # forward at least one segmentation
 
         # run feature extractor
-        feat_img = self.feature_img(img)
+        # feat_img = self.feature_img(img)
         feat_segs = list()
         for i in range(segs.size(1)):
             if mean[i] > 0:  # skip empty segmentation
@@ -845,7 +845,7 @@ class NLayerSetDiscriminator(nn.Module):
         )  # aggregated set feature
 
         # run classifier
-        feat = torch.cat([feat_img, feat_segs_sum], dim=1)
+        feat = torch.cat([feat_segs_sum], dim=1)
         out = self.classifier(feat)
         return out
 
