@@ -380,7 +380,7 @@ class ResnetSetGenerator(nn.Module):
         #     output_nc, n_downsampling, 2 * ngf, norm_layer, use_bias
         # )  # 2*ngf
         self.decoder_seg = self.get_decoder(
-            1, n_downsampling, 3 * ngf, norm_layer, use_bias
+            1, n_downsampling, 2 * ngf, norm_layer, use_bias
         )  # 3*ngf
 
     def get_encoder(
@@ -473,7 +473,6 @@ class ResnetSetGenerator(nn.Module):
         )  # aggregated set feature
 
         # run decoder
-        feat = torch.cat([enc_segs_sum], dim=1)
         out = [img]
         idx = 0
         for i in range(segs.size(1)):
