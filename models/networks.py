@@ -827,7 +827,7 @@ class NLayerSetDiscriminator(nn.Module):
 
     def forward(self, inp):
         # split data
-        img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
+        # img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
         mean = (segs + 1).mean(0).mean(-1).mean(-1)
         if mean.sum() == 0:
