@@ -486,6 +486,147 @@ class ResnetSetGenerator(nn.Module):
         return torch.cat(out, dim=1)
 
 
+#
+# ResNet generator for "set" of instance attributes
+# See https://openreview.net/forum?id=ryxwJhC9YX for details
+class ResnetMaskGenerator(nn.Module):
+    def __init__(
+        self,
+        input_nc,
+        output_nc,
+        ngf=64,
+        norm_layer=nn.BatchNorm2d,
+        use_dropout=False,
+        n_blocks=6,
+        padding_type="reflect",
+    ):
+        assert n_blocks >= 0
+        super(ResnetMaskGenerator, self).__init__()
+        self.input_nc = input_nc
+        self.output_nc = output_nc
+        self.ngf = ngf
+        if type(norm_layer) is functools.partial:
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
+
+        n_downsampling = 2
+        self.encoder_seg = self.get_encoder(
+            1,
+            n_downsampling,
+            ngf,
+            norm_layer,
+            use_dropout,
+            n_blocks,
+            padding_type,
+            use_bias,
+        )
+        self.decoder_seg = self.get_decoder(
+            1, n_downsampling, 2 * ngf, norm_layer, use_bias
+        )  # 2*ngf
+
+    def get_encoder(
+        self,
+        input_nc,
+        n_downsampling,
+        ngf,
+        norm_layer,
+        use_dropout,
+        n_blocks,
+        padding_type,
+        use_bias,
+    ):
+        model = [
+            nn.ReflectionPad2d(3),
+            nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
+            norm_layer(ngf),
+            nn.ReLU(True),
+        ]
+
+        for i in range(n_downsampling):
+            mult = 2**i
+            model += [
+                nn.Conv2d(
+                    ngf * mult,
+                    ngf * mult * 2,
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                    bias=use_bias,
+                ),
+                norm_layer(ngf * mult * 2),
+                nn.ReLU(True),
+            ]
+
+        mult = 2**n_downsampling
+        for i in range(n_blocks):
+            model += [
+                ResnetBlock(
+                    ngf * mult,
+                    padding_type=padding_type,
+                    norm_layer=norm_layer,
+                    use_dropout=use_dropout,
+                    use_bias=use_bias,
+                )
+            ]
+
+        return nn.Sequential(*model)
+
+    def get_decoder(self, output_nc, n_downsampling, ngf, norm_layer, use_bias):
+        model = []
+        for i in range(n_downsampling):
+            mult = 2 ** (n_downsampling - i)
+            model += [
+                nn.ConvTranspose2d(
+                    ngf * mult,
+                    int(ngf * mult / 2),
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                    output_padding=1,
+                    bias=use_bias,
+                ),
+                norm_layer(int(ngf * mult / 2)),
+                nn.ReLU(True),
+            ]
+        model += [nn.ReflectionPad2d(3)]
+        model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
+        model += [nn.Tanh()]
+        return nn.Sequential(*model)
+
+    def forward(self, inp):
+        # split data
+        segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
+        mean = (segs + 1).mean(0).mean(-1).mean(-1)
+        if mean.sum() == 0:
+            mean[0] = 1  # forward at least one segmentation
+
+        # run encoder
+        # enc_img = self.encoder_img(img)
+        enc_segs = list()
+        for i in range(segs.size(1)):
+            if mean[i] > 0:  # skip empty segmentation
+                seg = segs[:, i, :, :].unsqueeze(1)
+                enc_segs.append(self.encoder_seg(seg))
+        enc_segs = torch.cat(enc_segs)
+        enc_segs_sum = torch.sum(
+            enc_segs, dim=0, keepdim=True
+        )  # aggregated set feature
+
+        # run decoder
+        out = []
+        idx = 0
+        for i in range(segs.size(1)):
+            if mean[i] > 0:
+                enc_seg = enc_segs[idx].unsqueeze(0)  # (1, ngf, w, h)
+                idx += 1  # move to next index
+                feat = torch.cat([enc_seg, enc_segs_sum], dim=1)
+                out += [self.decoder_seg(feat)]
+            else:
+                out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
+        return torch.cat(out, dim=1)
+
+
 # Define a resnet block
 class ResnetBlock(nn.Module):
     def __init__(self, dim, padding_type, norm_layer, use_dropout, use_bias):
@@ -834,6 +975,110 @@ class NLayerSetDiscriminator(nn.Module):
 
         # run feature extractor
         # feat_img = self.feature_img(img)
+        feat_segs = list()
+        for i in range(segs.size(1)):
+            if mean[i] > 0:  # skip empty segmentation
+                seg = segs[:, i, :, :].unsqueeze(1)
+                feat_segs.append(self.feature_seg(seg))
+        feat_segs_sum = torch.sum(
+            torch.stack(feat_segs), dim=0
+        )  # aggregated set feature
+
+        # run classifier
+        feat = torch.cat([feat_segs_sum], dim=1)
+        out = self.classifier(feat)
+        return out
+
+
+# PatchGAN discriminator for "set" of instance attributes
+# See https://openreview.net/forum?id=ryxwJhC9YX for details
+class NLayerMaskDiscriminator(nn.Module):
+    def __init__(
+        self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_sigmoid=False
+    ):
+        super(NLayerMaskDiscriminator, self).__init__()
+        self.input_nc = input_nc
+        if type(norm_layer) is functools.partial:
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
+
+        kw = 4
+        padw = 1
+        self.feature_seg = self.get_feature_extractor(
+            1, ndf, n_layers, kw, padw, norm_layer, use_bias
+        )
+        self.classifier = self.get_classifier(
+            ndf, n_layers, kw, padw, norm_layer, use_sigmoid
+        )
+
+    def get_feature_extractor(
+        self, input_nc, ndf, n_layers, kw, padw, norm_layer, use_bias
+    ):
+        model = [
+            # Use spectral normalization
+            SpectralNorm(
+                nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw)
+            ),
+            nn.LeakyReLU(0.2, True),
+        ]
+        nf_mult = 1
+        nf_mult_prev = 1
+        for n in range(1, n_layers):
+            nf_mult_prev = nf_mult
+            nf_mult = min(2**n, 8)
+            model += [
+                # Use spectral normalization
+                SpectralNorm(
+                    nn.Conv2d(
+                        ndf * nf_mult_prev,
+                        ndf * nf_mult,
+                        kernel_size=kw,
+                        stride=2,
+                        padding=padw,
+                        bias=use_bias,
+                    )
+                ),
+                norm_layer(ndf * nf_mult),
+                nn.LeakyReLU(0.2, True),
+            ]
+        return nn.Sequential(*model)
+
+    def get_classifier(self, ndf, n_layers, kw, padw, norm_layer, use_sigmoid):
+        nf_mult_prev = min(2 ** (n_layers - 1), 8)
+        nf_mult = min(2**n_layers, 8)
+        model = [
+            # Use spectral normalization
+            SpectralNorm(
+                nn.Conv2d(
+                    ndf * nf_mult_prev,
+                    ndf * nf_mult,
+                    kernel_size=kw,
+                    stride=1,
+                    padding=padw,
+                )
+            ),
+            norm_layer(ndf * nf_mult),
+            nn.LeakyReLU(0.2, True),
+        ]
+        # Use spectral normalization
+        model += [
+            SpectralNorm(
+                nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)
+            )
+        ]
+        if use_sigmoid:
+            model += [nn.Sigmoid()]
+        return nn.Sequential(*model)
+
+    def forward(self, inp):
+        # split data
+        segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
+        mean = (segs + 1).mean(0).mean(-1).mean(-1)
+        if mean.sum() == 0:
+            mean[0] = 1  # forward at least one segmentation
+
+        # run feature extractor
         feat_segs = list()
         for i in range(segs.size(1)):
             if mean[i] > 0:  # skip empty segmentation
