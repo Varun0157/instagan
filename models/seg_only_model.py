@@ -6,9 +6,9 @@ from . import networks
 import numpy as np
 
 
-class InstaGANModel(BaseModel):
+class SegOnlyModel(BaseModel):
     def name(self):
-        return "InstaGANModel"
+        return "SegOnlyModel"
 
     @staticmethod
     def modify_commandline_options(parser, is_train=True):
