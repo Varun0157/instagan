@@ -637,6 +637,8 @@ class ResnetSetGenerator(nn.Module):
         return nn.Sequential(*model)
 
     def forward(self, inp):
+        print(inp.size())
+        print(self.input_nc)
         # NOTE: assumption of single instance
         # CX = 3 (RGB), CA = 1 (segmentation)
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
