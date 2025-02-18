@@ -1,8 +1,151 @@
+from typing import Optional
 import torch
 import torch.nn as nn
 from torch.nn import init
 import functools
 from torch.optim import lr_scheduler
+
+
+# ResNet generator for "set" of instance attributes
+# See https://openreview.net/forum?id=ryxwJhC9YX for details
+class ResnetSetMaskGenerator(nn.Module):
+    def __init__(
+        self,
+        input_nc,
+        output_nc,
+        ngf=64,
+        norm_layer=nn.BatchNorm2d,
+        use_dropout=False,
+        n_blocks=6,
+        padding_type="reflect",
+    ):
+        assert n_blocks >= 0
+        super(ResnetSetMaskGenerator, self).__init__()
+        self.input_nc = input_nc
+        self.output_nc = output_nc
+        self.ngf = ngf
+        if type(norm_layer) is functools.partial:
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
+
+        n_downsampling = 2
+        self.encoder_seg = self.get_encoder(
+            1,
+            n_downsampling,
+            ngf,
+            norm_layer,
+            use_dropout,
+            n_blocks,
+            padding_type,
+            use_bias,
+        )
+        # NOTE: moved ngf from 3 to 2: no longer passing encoded image
+        self.decoder_seg = self.get_decoder(
+            1, n_downsampling, 2 * ngf, norm_layer, use_bias
+        )  # 2*ngf
+
+    def get_encoder(
+        self,
+        input_nc,
+        n_downsampling,
+        ngf,
+        norm_layer,
+        use_dropout,
+        n_blocks,
+        padding_type,
+        use_bias,
+    ):
+        model = [
+            nn.ReflectionPad2d(3),
+            nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
+            norm_layer(ngf),
+            nn.ReLU(True),
+        ]
+
+        for i in range(n_downsampling):
+            mult = 2**i
+            model += [
+                nn.Conv2d(
+                    ngf * mult,
+                    ngf * mult * 2,
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                    bias=use_bias,
+                ),
+                norm_layer(ngf * mult * 2),
+                nn.ReLU(True),
+            ]
+
+        mult = 2**n_downsampling
+        for i in range(n_blocks):
+            model += [
+                ResnetBlock(
+                    ngf * mult,
+                    padding_type=padding_type,
+                    norm_layer=norm_layer,
+                    use_dropout=use_dropout,
+                    use_bias=use_bias,
+                )
+            ]
+
+        return nn.Sequential(*model)
+
+    def get_decoder(self, output_nc, n_downsampling, ngf, norm_layer, use_bias):
+        model = []
+        for i in range(n_downsampling):
+            mult = 2 ** (n_downsampling - i)
+            model += [
+                nn.ConvTranspose2d(
+                    ngf * mult,
+                    int(ngf * mult / 2),
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                    output_padding=1,
+                    bias=use_bias,
+                ),
+                norm_layer(int(ngf * mult / 2)),
+                nn.ReLU(True),
+            ]
+        model += [nn.ReflectionPad2d(3)]
+        model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
+        model += [nn.Tanh()]
+        return nn.Sequential(*model)
+
+    def forward(self, inp):
+        # split data
+        img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
+        segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
+        mean = (segs + 1).mean(0).mean(-1).mean(-1)
+        if mean.sum() == 0:
+            mean[0] = 1  # forward at least one segmentation
+
+        # run encoder
+        enc_segs = list()
+        for i in range(segs.size(1)):
+            if mean[i] > 0:  # skip empty segmentation
+                seg = segs[:, i, :, :].unsqueeze(1)
+                enc_segs.append(self.encoder_seg(seg))
+        enc_segs = torch.cat(enc_segs)
+        enc_segs_sum = torch.sum(
+            enc_segs, dim=0, keepdim=True
+        )  # aggregated set feature
+
+        # run decoder
+        out = [img]
+        idx = 0
+        for i in range(segs.size(1)):
+            if mean[i] > 0:
+                enc_seg = enc_segs[idx].unsqueeze(0)  # (1, ngf, w, h)
+                idx += 1  # move to next index
+                feat = torch.cat([enc_seg, enc_segs_sum], dim=1)
+                out += [self.decoder_seg(feat)]
+            else:
+                out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
+        return torch.cat(out, dim=1)
+
 
 ###############################################################################
 # Helper Functions
@@ -94,6 +237,7 @@ def define_G(
     output_nc,
     ngf,
     netG,
+    mask_gen: Optional[ResnetSetMaskGenerator],
     norm="batch",
     use_dropout=False,
     init_type="normal",
@@ -116,8 +260,22 @@ def define_G(
             n_blocks=9,
         )
     elif netG == "set":
-        net = (
-            ResnetSetGenerator(
+        if not seg_only:
+            if mask_gen is None:
+                raise Exception(
+                    "mask_gen must be provided for [set] generator in img gen mode"
+                )
+            net = ResnetSetGenerator(
+                input_nc,
+                output_nc,
+                mask_gen,
+                ngf,
+                norm_layer=norm_layer,
+                use_dropout=use_dropout,
+                n_blocks=9,
+            )
+        else:
+            net = ResnetSetMaskGenerator(
                 input_nc,
                 output_nc,
                 ngf,
@@ -125,16 +283,6 @@ def define_G(
                 use_dropout=use_dropout,
                 n_blocks=9,
             )
-            if not seg_only
-            else ResnetSetMaskGenerator(
-                input_nc,
-                output_nc,
-                ngf,
-                norm_layer=norm_layer,
-                use_dropout=use_dropout,
-                n_blocks=9,
-            )
-        )
     else:
         raise NotImplementedError("Generator model name [%s] is not recognized" % netG)
     return init_net(net, init_type, init_gain, gpu_ids)
@@ -364,6 +512,7 @@ class ResnetSetGenerator(nn.Module):
         self,
         input_nc,
         output_nc,
+        mask_gen: ResnetSetMaskGenerator,
         ngf=64,
         norm_layer=nn.BatchNorm2d,
         use_dropout=False,
@@ -375,7 +524,7 @@ class ResnetSetGenerator(nn.Module):
         self.input_nc = input_nc
         self.output_nc = output_nc
         self.ngf = ngf
-        if type(norm_layer) == functools.partial:
+        if type(norm_layer) is functools.partial:
             use_bias = norm_layer.func == nn.InstanceNorm2d
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
@@ -391,7 +540,7 @@ class ResnetSetGenerator(nn.Module):
             padding_type,
             use_bias,
         )
-        self.encoder_seg = self.get_encoder(
+        self.encoder_seg_src = self.get_encoder(
             1,
             n_downsampling,
             ngf,
@@ -401,155 +550,22 @@ class ResnetSetGenerator(nn.Module):
             padding_type,
             use_bias,
         )
+        self.encoder_seg_trg = self.get_encoder(
+            1,
+            n_downsampling,
+            ngf,
+            norm_layer,
+            use_dropout,
+            n_blocks,
+            padding_type,
+            use_bias,
+        )
+
         self.decoder_img = self.get_decoder(
-            output_nc, n_downsampling, 2 * ngf, norm_layer, use_bias
-        )  # 2*ngf
-        self.decoder_seg = self.get_decoder(
-            1, n_downsampling, 3 * ngf, norm_layer, use_bias
+            output_nc, n_downsampling, 3 * ngf, norm_layer, use_bias
         )  # 3*ngf
 
-    def get_encoder(
-        self,
-        input_nc,
-        n_downsampling,
-        ngf,
-        norm_layer,
-        use_dropout,
-        n_blocks,
-        padding_type,
-        use_bias,
-    ):
-        model = [
-            nn.ReflectionPad2d(3),
-            nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
-            norm_layer(ngf),
-            nn.ReLU(True),
-        ]
-
-        for i in range(n_downsampling):
-            mult = 2**i
-            model += [
-                nn.Conv2d(
-                    ngf * mult,
-                    ngf * mult * 2,
-                    kernel_size=3,
-                    stride=2,
-                    padding=1,
-                    bias=use_bias,
-                ),
-                norm_layer(ngf * mult * 2),
-                nn.ReLU(True),
-            ]
-
-        mult = 2**n_downsampling
-        for i in range(n_blocks):
-            model += [
-                ResnetBlock(
-                    ngf * mult,
-                    padding_type=padding_type,
-                    norm_layer=norm_layer,
-                    use_dropout=use_dropout,
-                    use_bias=use_bias,
-                )
-            ]
-
-        return nn.Sequential(*model)
-
-    def get_decoder(self, output_nc, n_downsampling, ngf, norm_layer, use_bias):
-        model = []
-        for i in range(n_downsampling):
-            mult = 2 ** (n_downsampling - i)
-            model += [
-                nn.ConvTranspose2d(
-                    ngf * mult,
-                    int(ngf * mult / 2),
-                    kernel_size=3,
-                    stride=2,
-                    padding=1,
-                    output_padding=1,
-                    bias=use_bias,
-                ),
-                norm_layer(int(ngf * mult / 2)),
-                nn.ReLU(True),
-            ]
-        model += [nn.ReflectionPad2d(3)]
-        model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
-        model += [nn.Tanh()]
-        return nn.Sequential(*model)
-
-    def forward(self, inp):
-        # split data
-        img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
-        segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
-        mean = (segs + 1).mean(0).mean(-1).mean(-1)
-        if mean.sum() == 0:
-            mean[0] = 1  # forward at least one segmentation
-
-        # run encoder
-        enc_img = self.encoder_img(img)
-        enc_segs = list()
-        for i in range(segs.size(1)):
-            if mean[i] > 0:  # skip empty segmentation
-                seg = segs[:, i, :, :].unsqueeze(1)
-                enc_segs.append(self.encoder_seg(seg))
-        enc_segs = torch.cat(enc_segs)
-        enc_segs_sum = torch.sum(
-            enc_segs, dim=0, keepdim=True
-        )  # aggregated set feature
-
-        # run decoder
-        feat = torch.cat([enc_img, enc_segs_sum], dim=1)
-        out = [self.decoder_img(feat)]
-        idx = 0
-        for i in range(segs.size(1)):
-            if mean[i] > 0:
-                enc_seg = enc_segs[idx].unsqueeze(0)  # (1, ngf, w, h)
-                idx += 1  # move to next index
-                feat = torch.cat([enc_seg, enc_img, enc_segs_sum], dim=1)
-                out += [self.decoder_seg(feat)]
-            else:
-                out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
-        return torch.cat(out, dim=1)
-
-
-# ResNet generator for "set" of instance attributes
-# See https://openreview.net/forum?id=ryxwJhC9YX for details
-class ResnetSetMaskGenerator(nn.Module):
-    def __init__(
-        self,
-        input_nc,
-        output_nc,
-        ngf=64,
-        norm_layer=nn.BatchNorm2d,
-        use_dropout=False,
-        n_blocks=6,
-        padding_type="reflect",
-    ):
-        assert n_blocks >= 0
-        super(ResnetSetMaskGenerator, self).__init__()
-        self.input_nc = input_nc
-        self.output_nc = output_nc
-        self.ngf = ngf
-        if type(norm_layer) is functools.partial:
-            use_bias = norm_layer.func == nn.InstanceNorm2d
-        else:
-            use_bias = norm_layer == nn.InstanceNorm2d
-
-        n_downsampling = 2
-        self.encoder_seg = self.get_encoder(
-            1,
-            n_downsampling,
-            ngf,
-            norm_layer,
-            use_dropout,
-            n_blocks,
-            padding_type,
-            use_bias,
-        )
-        # NOTE: moved ngf from 3 to 2: no longer passing encoded image
-        self.decoder_seg = self.get_decoder(
-            1, n_downsampling, 2 * ngf, norm_layer, use_bias
-        )  # 2*ngf
+        self.mask_generator = mask_gen
 
     def get_encoder(
         self,
@@ -621,36 +637,26 @@ class ResnetSetMaskGenerator(nn.Module):
         return nn.Sequential(*model)
 
     def forward(self, inp):
-        # split data
+        # NOTE: assumption of single instance
+        # CX = 3 (RGB), CA = 1 (segmentation)
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
-        segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
-        mean = (segs + 1).mean(0).mean(-1).mean(-1)
-        if mean.sum() == 0:
-            mean[0] = 1  # forward at least one segmentation
+        src_segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
+        # NOTE: eventually, move to not pass image to mask_gen
+        trg_segs = self.mask_generator(inp)  # (B, CA, W, H)
 
-        # run encoder
-        enc_segs = list()
-        for i in range(segs.size(1)):
-            if mean[i] > 0:  # skip empty segmentation
-                seg = segs[:, i, :, :].unsqueeze(1)
-                enc_segs.append(self.encoder_seg(seg))
-        enc_segs = torch.cat(enc_segs)
-        enc_segs_sum = torch.sum(
-            enc_segs, dim=0, keepdim=True
-        )  # aggregated set feature
+        # encoder
+        enc_img = self.encoder_img(img)  # (B, ngf, W, H)
+        enc_seg_src = self.encoder_seg_src(src_segs)  # (B, ngf, W, H)
+        enc_seg_trg = self.encoder_seg_trg(trg_segs)  # (B, ngf, W, H)
 
-        # run decoder
-        out = [img]
-        idx = 0
-        for i in range(segs.size(1)):
-            if mean[i] > 0:
-                enc_seg = enc_segs[idx].unsqueeze(0)  # (1, ngf, w, h)
-                idx += 1  # move to next index
-                feat = torch.cat([enc_seg, enc_segs_sum], dim=1)
-                out += [self.decoder_seg(feat)]
-            else:
-                out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
-        return torch.cat(out, dim=1)
+        # decoder
+        img_feat = torch.cat(
+            [enc_img, enc_seg_src, enc_seg_trg], dim=1
+        )  # (B, 3*ngf, W, H)
+        decoded_img = self.decoder_img(img_feat)  # (B, CX, W, H)
+
+        out = torch.cat([decoded_img, trg_segs], dim=1)  # (B, CX+CA, W, H)
+        return out
 
 
 # Define a resnet block
