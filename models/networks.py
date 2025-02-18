@@ -642,7 +642,8 @@ class ResnetSetGenerator(nn.Module):
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
         src_segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
         # NOTE: eventually, move to not pass image to mask_gen
-        trg_segs = self.mask_generator(inp)  # (B, CA, W, H)
+        trg = self.mask_generator(inp)  # (B, CA + CX, W, H)
+        trg_segs = trg[:, self.input_nc :, :, :]  # (B, CA, W, H)
 
         # encoder
         enc_img = self.encoder_img(img)  # (B, ngf, W, H)
