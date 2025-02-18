@@ -260,14 +260,10 @@ class InstaGANModel(BaseModel):
 
         # forward A
         if self.forward_A:
-            print("real_A_img_sng: ", self.real_A_img_sng.shape)
-            print("real_A_seg_sng: ", self.real_A_seg_sng.shape)
             self.real_A_sng = torch.cat(
                 [self.real_A_img_sng, self.real_A_seg_sng], dim=1
             )
-            print("real_A_sng: ", self.real_A_sng.shape)
             self.fake_B_sng = self.netG_A(self.real_A_sng)
-            print("fake_B_sng: ", self.fake_B_sng.shape)
             self.rec_A_sng = self.netG_B(self.fake_B_sng)
 
             self.fake_B_img_sng, self.fake_B_seg_sng = self.split(self.fake_B_sng)
