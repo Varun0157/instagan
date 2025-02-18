@@ -99,11 +99,14 @@ def define_G(
     init_type="normal",
     init_gain=0.02,
     gpu_ids=[],
+    seg_only: bool = False,
 ):
     net = None
     norm_layer = get_norm_layer(norm_type=norm)
 
     if netG == "basic":
+        if seg_only:
+            raise Exception("seg only implementation not complete for [basic]")
         net = ResnetGenerator(
             input_nc,
             output_nc,
@@ -113,13 +116,24 @@ def define_G(
             n_blocks=9,
         )
     elif netG == "set":
-        net = ResnetSetGenerator(
-            input_nc,
-            output_nc,
-            ngf,
-            norm_layer=norm_layer,
-            use_dropout=use_dropout,
-            n_blocks=9,
+        net = (
+            ResnetSetGenerator(
+                input_nc,
+                output_nc,
+                ngf,
+                norm_layer=norm_layer,
+                use_dropout=use_dropout,
+                n_blocks=9,
+            )
+            if not seg_only
+            else ResnetSetMaskGenerator(
+                input_nc,
+                output_nc,
+                ngf,
+                norm_layer=norm_layer,
+                use_dropout=use_dropout,
+                n_blocks=9,
+            )
         )
     else:
         raise NotImplementedError("Generator model name [%s] is not recognized" % netG)
@@ -136,17 +150,28 @@ def define_D(
     init_type="normal",
     init_gain=0.02,
     gpu_ids=[],
+    seg_only: bool = False,
 ):
     net = None
     norm_layer = get_norm_layer(norm_type=norm)
 
     if netD == "basic":
+        if seg_only:
+            raise Exception("seg only implementation not complete for [basic]")
         net = NLayerDiscriminator(
-            input_nc, ndf, n_layers=3, norm_layer=norm_layer, use_sigmoid=use_sigmoid
+            input_nc,
+            ndf,
+            n_layers=n_layers_D,
+            norm_layer=norm_layer,
+            use_sigmoid=use_sigmoid,
         )
     elif netD == "set":
         net = NLayerSetDiscriminator(
-            input_nc, ndf, n_layers=3, norm_layer=norm_layer, use_sigmoid=use_sigmoid
+            input_nc,
+            ndf,
+            n_layers=n_layers_D,
+            norm_layer=norm_layer,
+            use_sigmoid=use_sigmoid,
         )
     else:
         raise NotImplementedError(

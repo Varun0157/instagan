@@ -125,13 +125,5 @@ class TrainOptions(BaseOptions):
             help="multiply by a gamma every lr_decay_iters iterations",
         )
 
-        # custom options
-        parser.add_argument(
-            "--seg_only",
-            type=bool,
-            default=False,
-            help="ignore images during generation phase",
-        )
-
         self.isTrain = True
         return parser

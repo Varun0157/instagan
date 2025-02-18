@@ -109,6 +109,7 @@ class SegOnlyModel(BaseModel):
             opt.init_type,
             opt.init_gain,
             self.gpu_ids,
+            seg_only=True,
         )
         self.netG_B = networks.define_G(
             opt.output_nc,
@@ -120,6 +121,7 @@ class SegOnlyModel(BaseModel):
             opt.init_type,
             opt.init_gain,
             self.gpu_ids,
+            seg_only=True,
         )
         if self.isTrain:
             use_sigmoid = opt.no_lsgan
@@ -133,6 +135,7 @@ class SegOnlyModel(BaseModel):
                 opt.init_type,
                 opt.init_gain,
                 self.gpu_ids,
+                seg_only=True,
             )
             self.netD_B = networks.define_D(
                 opt.input_nc,
@@ -144,6 +147,7 @@ class SegOnlyModel(BaseModel):
                 opt.init_type,
                 opt.init_gain,
                 self.gpu_ids,
+                seg_only=True,
             )
 
         if self.isTrain:
