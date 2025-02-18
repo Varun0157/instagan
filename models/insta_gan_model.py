@@ -2,6 +2,7 @@ import torch
 import itertools
 from util.image_pool import ImagePool
 from .base_model import BaseModel
+from .seg_only_model import SegOnlyModel
 from . import networks
 import numpy as np
 
@@ -57,8 +58,15 @@ class InstaGANModel(BaseModel):
 
         return parser
 
-    def initialize(self, opt):
+    def initialize(self, opt, segModel: SegOnlyModel):
         BaseModel.initialize(self, opt)
+
+        self.segModel = segModel
+        # TODO:
+        # 1. alter the forward pass to use the results of segModel (will have to do setData then forward maybe)
+        # 2. freeze the above model? Consider
+        # 3. alter the checkpointing to save and load the above somehow
+        # 4. alter the train code to train the above segModel and then pass it to InstaGANModel and train
 
         self.ins_iter = (
             self.opt.ins_max // self.opt.ins_per
@@ -95,9 +103,6 @@ class InstaGANModel(BaseModel):
         else:
             self.model_names = ["G_A", "G_B"]
 
-        # load/define networks
-        # The naming conversion is different from those used in the paper
-        # Code (paper): G_A (G), G_B (F), D_A (D_Y), D_B (D_X)
         self.netG_A = networks.define_G(
             opt.input_nc,
             opt.output_nc,
@@ -120,6 +125,7 @@ class InstaGANModel(BaseModel):
             opt.init_gain,
             self.gpu_ids,
         )
+
         if self.isTrain:
             use_sigmoid = opt.no_lsgan
             self.netD_A = networks.define_D(
