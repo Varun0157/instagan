@@ -65,6 +65,7 @@ class SegOnlyModel(BaseModel):
         )  # number of forward iteration
 
         # specify the training losses you want to print out. The program will call base_model.get_current_losses
+        # NOTE: context losses don't really make sense here - but seeing 0 loss works as a sanity check
         self.loss_names = [
             "D_A",
             "G_A",

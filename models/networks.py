@@ -356,16 +356,16 @@ class ResnetSetGenerator(nn.Module):
             use_bias = norm_layer == nn.InstanceNorm2d
 
         n_downsampling = 2
-        # self.encoder_img = self.get_encoder(
-        #     input_nc,
-        #     n_downsampling,
-        #     ngf,
-        #     norm_layer,
-        #     use_dropout,
-        #     n_blocks,
-        #     padding_type,
-        #     use_bias,
-        # )
+        self.encoder_img = self.get_encoder(
+            input_nc,
+            n_downsampling,
+            ngf,
+            norm_layer,
+            use_dropout,
+            n_blocks,
+            padding_type,
+            use_bias,
+        )
         self.encoder_seg = self.get_encoder(
             1,
             n_downsampling,
@@ -376,11 +376,11 @@ class ResnetSetGenerator(nn.Module):
             padding_type,
             use_bias,
         )
-        # self.decoder_img = self.get_decoder(
-        #     output_nc, n_downsampling, 2 * ngf, norm_layer, use_bias
-        # )  # 2*ngf
+        self.decoder_img = self.get_decoder(
+            output_nc, n_downsampling, 2 * ngf, norm_layer, use_bias
+        )  # 2*ngf
         self.decoder_seg = self.get_decoder(
-            1, n_downsampling, 2 * ngf, norm_layer, use_bias
+            1, n_downsampling, 3 * ngf, norm_layer, use_bias
         )  # 3*ngf
 
     def get_encoder(
@@ -461,7 +461,7 @@ class ResnetSetGenerator(nn.Module):
             mean[0] = 1  # forward at least one segmentation
 
         # run encoder
-        # enc_img = self.encoder_img(img)
+        enc_img = self.encoder_img(img)
         enc_segs = list()
         for i in range(segs.size(1)):
             if mean[i] > 0:  # skip empty segmentation
@@ -473,23 +473,23 @@ class ResnetSetGenerator(nn.Module):
         )  # aggregated set feature
 
         # run decoder
-        out = [img]
+        feat = torch.cat([enc_img, enc_segs_sum], dim=1)
+        out = [self.decoder_img(feat)]
         idx = 0
         for i in range(segs.size(1)):
             if mean[i] > 0:
                 enc_seg = enc_segs[idx].unsqueeze(0)  # (1, ngf, w, h)
                 idx += 1  # move to next index
-                feat = torch.cat([enc_seg, enc_segs_sum], dim=1)
+                feat = torch.cat([enc_seg, enc_img, enc_segs_sum], dim=1)
                 out += [self.decoder_seg(feat)]
             else:
                 out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
         return torch.cat(out, dim=1)
 
 
-#
 # ResNet generator for "set" of instance attributes
 # See https://openreview.net/forum?id=ryxwJhC9YX for details
-class ResnetMaskGenerator(nn.Module):
+class ResnetSetMaskGenerator(nn.Module):
     def __init__(
         self,
         input_nc,
@@ -501,7 +501,7 @@ class ResnetMaskGenerator(nn.Module):
         padding_type="reflect",
     ):
         assert n_blocks >= 0
-        super(ResnetMaskGenerator, self).__init__()
+        super(ResnetSetMaskGenerator, self).__init__()
         self.input_nc = input_nc
         self.output_nc = output_nc
         self.ngf = ngf
@@ -521,6 +521,7 @@ class ResnetMaskGenerator(nn.Module):
             padding_type,
             use_bias,
         )
+        # NOTE: moved ngf from 3 to 2: no longer passing encoded image
         self.decoder_seg = self.get_decoder(
             1, n_downsampling, 2 * ngf, norm_layer, use_bias
         )  # 2*ngf
@@ -596,13 +597,13 @@ class ResnetMaskGenerator(nn.Module):
 
     def forward(self, inp):
         # split data
+        img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
         mean = (segs + 1).mean(0).mean(-1).mean(-1)
         if mean.sum() == 0:
             mean[0] = 1  # forward at least one segmentation
 
         # run encoder
-        # enc_img = self.encoder_img(img)
         enc_segs = list()
         for i in range(segs.size(1)):
             if mean[i] > 0:  # skip empty segmentation
@@ -614,7 +615,7 @@ class ResnetMaskGenerator(nn.Module):
         )  # aggregated set feature
 
         # run decoder
-        out = []
+        out = [img]
         idx = 0
         for i in range(segs.size(1)):
             if mean[i] > 0:
@@ -889,22 +890,22 @@ class NLayerSetDiscriminator(nn.Module):
     ):
         super(NLayerSetDiscriminator, self).__init__()
         self.input_nc = input_nc
-        if type(norm_layer) == functools.partial:
+        if type(norm_layer) is functools.partial:
             use_bias = norm_layer.func == nn.InstanceNorm2d
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
 
         kw = 4
         padw = 1
-        # self.feature_img = self.get_feature_extractor(
-        #     input_nc, ndf, n_layers, kw, padw, norm_layer, use_bias
-        # )
+        self.feature_img = self.get_feature_extractor(
+            input_nc, ndf, n_layers, kw, padw, norm_layer, use_bias
+        )
         self.feature_seg = self.get_feature_extractor(
             1, ndf, n_layers, kw, padw, norm_layer, use_bias
         )
         self.classifier = self.get_classifier(
-            ndf, n_layers, kw, padw, norm_layer, use_sigmoid
-        )
+            2 * ndf, n_layers, kw, padw, norm_layer, use_sigmoid
+        )  # 2*ndf
 
     def get_feature_extractor(
         self, input_nc, ndf, n_layers, kw, padw, norm_layer, use_bias
@@ -967,14 +968,14 @@ class NLayerSetDiscriminator(nn.Module):
 
     def forward(self, inp):
         # split data
-        # img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
+        img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
         mean = (segs + 1).mean(0).mean(-1).mean(-1)
         if mean.sum() == 0:
             mean[0] = 1  # forward at least one segmentation
 
         # run feature extractor
-        # feat_img = self.feature_img(img)
+        feat_img = self.feature_img(img)
         feat_segs = list()
         for i in range(segs.size(1)):
             if mean[i] > 0:  # skip empty segmentation
@@ -985,18 +986,18 @@ class NLayerSetDiscriminator(nn.Module):
         )  # aggregated set feature
 
         # run classifier
-        feat = torch.cat([feat_segs_sum], dim=1)
+        feat = torch.cat([feat_img, feat_segs_sum], dim=1)
         out = self.classifier(feat)
         return out
 
 
 # PatchGAN discriminator for "set" of instance attributes
 # See https://openreview.net/forum?id=ryxwJhC9YX for details
-class NLayerMaskDiscriminator(nn.Module):
+class NLayerSetMaskDiscriminator(nn.Module):
     def __init__(
         self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_sigmoid=False
     ):
-        super(NLayerMaskDiscriminator, self).__init__()
+        super(NLayerSetMaskDiscriminator, self).__init__()
         self.input_nc = input_nc
         if type(norm_layer) is functools.partial:
             use_bias = norm_layer.func == nn.InstanceNorm2d
@@ -1010,7 +1011,7 @@ class NLayerMaskDiscriminator(nn.Module):
         )
         self.classifier = self.get_classifier(
             ndf, n_layers, kw, padw, norm_layer, use_sigmoid
-        )
+        )  # ndf
 
     def get_feature_extractor(
         self, input_nc, ndf, n_layers, kw, padw, norm_layer, use_bias
@@ -1073,6 +1074,8 @@ class NLayerMaskDiscriminator(nn.Module):
 
     def forward(self, inp):
         # split data
+
+        # img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
         mean = (segs + 1).mean(0).mean(-1).mean(-1)
         if mean.sum() == 0:
