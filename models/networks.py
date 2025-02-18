@@ -637,29 +637,42 @@ class ResnetSetGenerator(nn.Module):
         return nn.Sequential(*model)
 
     def forward(self, inp):
-        print(inp.size())
-        print(self.input_nc)
-        # NOTE: assumption of single instance
-        # CX = 3 (RGB), CA = 1 (segmentation)
+        # split data
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
-        src_segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
-        # NOTE: eventually, move to not pass image to mask_gen
+        segs_src = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
+
+        mean = (segs_src + 1).mean(0).mean(-1).mean(-1)
+        if mean.sum() == 0:
+            mean[0] = 1  # forward at least one segmentation
+
         trg = self.mask_generator(inp)  # (B, CA + CX, W, H)
-        trg_segs = trg[:, self.input_nc :, :, :]  # (B, CA, W, H)
+        segs_trg = trg[:, self.input_nc :, :, :]  # (B, CA, W, H)
 
-        # encoder
-        enc_img = self.encoder_img(img)  # (B, ngf, W, H)
-        enc_seg_src = self.encoder_seg_src(src_segs)  # (B, ngf, W, H)
-        enc_seg_trg = self.encoder_seg_trg(trg_segs)  # (B, ngf, W, H)
+        # run encoder
+        enc_img = self.encoder_img(img)
 
-        # decoder
-        img_feat = torch.cat(
-            [enc_img, enc_seg_src, enc_seg_trg], dim=1
-        )  # (B, 3*ngf, W, H)
-        decoded_img = self.decoder_img(img_feat)  # (B, CX, W, H)
+        enc_segs_src = list()
+        for i in range(segs_src.size(1)):
+            if mean[i] <= 0:
+                continue
+            seg = segs_src[:, i, :, :].unsqueeze(1)
+            enc_segs_src.append(self.encoder_seg_src(seg))
+        enc_segs_src = torch.cat(enc_segs_src)
+        enc_segs_src_sum = torch.sum(enc_segs_src, dim=0, keepdim=True)
 
-        out = torch.cat([decoded_img, trg_segs], dim=1)  # (B, CX+CA, W, H)
-        return out
+        enc_segs_trg = list()
+        for i in range(segs_trg.size(1)):
+            if mean[i] <= 0:
+                continue
+            seg = segs_trg[:, i, :, :].unsqueeze(1)
+            enc_segs_trg.append(self.encoder_seg_trg(seg))
+        enc_segs_trg = torch.cat(enc_segs_trg)
+        enc_segs_trg_sum = torch.sum(enc_segs_trg, dim=0, keepdim=True)
+
+        # run decoder
+        feat = torch.cat([enc_img, enc_segs_src_sum, enc_segs_trg_sum], dim=1)
+        out = [self.decoder_img(feat), segs_trg]
+        return torch.cat(out, dim=1)
 
 
 # Define a resnet block
