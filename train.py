@@ -1,17 +1,20 @@
 import time
+from typing import Optional
+from models.seg_only_model import SegOnlyModel
 from options.train_options import TrainOptions
 from data import CreateDataLoader
 from models import create_model
+from models.base_model import BaseModel
 from util.visualizer import Visualizer
 
-if __name__ == "__main__":
-    opt = TrainOptions().parse()
+
+def train(opt, seg_only_model: Optional[SegOnlyModel] = None) -> BaseModel:
     data_loader = CreateDataLoader(opt)
     dataset = data_loader.load_data()
     dataset_size = len(data_loader)
     print("#training images = %d" % dataset_size)
 
-    model = create_model(opt)
+    model = create_model(opt, seg_only_model)
     model.setup(opt)
     visualizer = Visualizer(opt)
     total_steps = 0
@@ -68,3 +71,23 @@ if __name__ == "__main__":
             % (epoch, opt.niter + opt.niter_decay, time.time() - epoch_start_time)
         )
         model.update_learning_rate()
+
+    return model
+
+
+if __name__ == "__main__":
+    opt = TrainOptions().parse()
+    name = opt.name
+    model = opt.model
+
+    if model != "insta_gan":
+        raise Exception("Model not found")
+
+    opt.name = name + "_seg"
+    opt.model = "seg_only"
+    seg_only_model = train(opt)
+
+    opt.name = name
+    opt.model = "insta_gan"
+    assert type(seg_only_model) is SegOnlyModel
+    final_model = train(opt, seg_only_model)

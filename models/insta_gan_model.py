@@ -61,12 +61,6 @@ class InstaGANModel(BaseModel):
     def initialize(self, opt, segModel: SegOnlyModel):
         BaseModel.initialize(self, opt)
 
-        # TODO:
-        # 1. alter the forward pass to use the results of segModel (will have to do setData then forward maybe)
-        # 2. freeze the above model? Consider - na, do it in main
-        # 3. alter the checkpointing to save and load the above somehow
-        # 4. alter the train code to train the above segModel and then pass it to InstaGANModel and train
-
         self.ins_iter = (
             self.opt.ins_max // self.opt.ins_per
         )  # number of forward iteration

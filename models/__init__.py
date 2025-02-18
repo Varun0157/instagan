@@ -1,6 +1,8 @@
 import importlib
+from typing import Optional
 from models.base_model import BaseModel
 from models.insta_gan_model import InstaGANModel
+from models.seg_only_model import SegOnlyModel
 
 
 def find_model_using_name(model_name):
@@ -34,10 +36,13 @@ def get_option_setter(model_name):
     return model_class.modify_commandline_options
 
 
-def create_model(opt):
+def create_model(opt, seg_model: Optional[SegOnlyModel] = None):
     model = find_model_using_name(opt.model)
     instance = model()
-    assert type(instance) is InstaGANModel  # to aid the lsp and myself
-    instance.initialize(opt)
+    if type(instance) is InstaGANModel:
+        assert seg_model is not None
+        instance.initialize(opt, seg_model)
+    else:
+        instance.initialize(opt)
     print("model [%s] was created" % (instance.name()))
     return instance
