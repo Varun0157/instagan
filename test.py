@@ -18,8 +18,12 @@ if __name__ == "__main__":
     data_loader = CreateDataLoader(opt)
     dataset = data_loader.load_data()
 
-    assert opt.model == "insta_gan"
-    model = create_model(opt, SegOnlyModel())
+    opt.model = "seg_only"
+    seg_only_model = create_model(opt)
+    assert type(seg_only_model) is SegOnlyModel
+
+    opt.model = "insta_gan"
+    model = create_model(opt, seg_only_model)
     model.setup(opt)
     # create a website
     web_dir = os.path.join(opt.results_dir, opt.name, "%s_%s" % (opt.phase, opt.epoch))
