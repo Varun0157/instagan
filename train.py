@@ -7,6 +7,15 @@ from models import create_model
 from models.base_model import BaseModel
 from util.visualizer import Visualizer
 
+import wandb
+import wandb.sdk.wandb_run
+
+
+def get_run_name(opt):
+    components = [opt.name, opt.model]
+    project_name = "-".join([str(c) for c in components])
+    return project_name
+
 
 def train(opt, seg_only_model: Optional[SegOnlyModel] = None) -> BaseModel:
     data_loader = CreateDataLoader(opt)
@@ -77,6 +86,9 @@ def train(opt, seg_only_model: Optional[SegOnlyModel] = None) -> BaseModel:
 
 if __name__ == "__main__":
     opt = TrainOptions().parse()
+
+    run = wandb.init(project="instagan", name=get_run_name(opt), config=opt)
+
     name = opt.name
     model = opt.model
 
@@ -92,3 +104,6 @@ if __name__ == "__main__":
     opt.name = name
     opt.model = "insta_gan"
     final_model = train(opt, seg_only_model)
+
+    assert type(run) is wandb.sdk.wandb_run.Run
+    run.finish()
