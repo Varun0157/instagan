@@ -7,7 +7,7 @@ from util.visualizer import Visualizer
 if __name__ == "__main__":
     opt = TrainOptions().parse()
     if opt.ins_per is None or opt.ins_per != 1:
-        print("[warning] instance_per is not 1, which may cause an error, changing...")
+        print("[warning] ins_per is not 1, which may cause an error, changing...")
         opt.ins_per = 1
 
     data_loader = CreateDataLoader(opt)
