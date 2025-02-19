@@ -11,8 +11,6 @@ from PIL import Image
 
 import wandb
 
-wandb.init(project="instagan")
-
 if sys.version_info[0] == 2:
     VisdomExceptionBase = Exception
 else:

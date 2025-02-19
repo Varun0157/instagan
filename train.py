@@ -4,11 +4,28 @@ from data import CreateDataLoader
 from models import create_model
 from util.visualizer import Visualizer
 
+import wandb
+import wandb.sdk.wandb_run
+
+
+def get_run_name(opt):
+    components = [opt.name, opt.model]
+    project_name = "-".join([str(c) for c in components])
+    return project_name
+
+
 if __name__ == "__main__":
     opt = TrainOptions().parse()
     if opt.ins_per is None or opt.ins_per != 1:
         print("[warning] ins_per is not 1, which may cause an error, changing...")
         opt.ins_per = 1
+
+    run = wandb.init(
+        project="instagan",
+        name=get_run_name(opt),
+        config=opt,
+    )
+    assert type(run) is wandb.sdk.wandb_run.Run
 
     data_loader = CreateDataLoader(opt)
     dataset = data_loader.load_data()
@@ -72,3 +89,5 @@ if __name__ == "__main__":
             % (epoch, opt.niter + opt.niter_decay, time.time() - epoch_start_time)
         )
         model.update_learning_rate()
+
+    run.finish()
