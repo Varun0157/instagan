@@ -1,5 +1,8 @@
 # InstaGAN: Instance-aware Image-to-Image Translation
 
+**Edit:** This repository loads the pre-trained generator weights from the `no-rgb` run while keeping the discriminator initialization random, enabling the generation and modification of RGB images.
+
+---
 **Warning:** This repo contains a model which has potential ethical concerns. Remark that the task of jeans<->skirt was a bad application and should not be used in future research. See the [twitter thread](https://twitter.com/SashaMTL/status/1453491661720391685) for the discussion.
 
 ---
