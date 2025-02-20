@@ -121,6 +121,17 @@ class InstaGANModel(BaseModel):
             opt.init_gain,
             self.gpu_ids,
         )
+
+    
+        G_A_pretrained_path = "../pretrained_weights/latest_net_G_A.pth"
+        G_B_pretrained_path = "../pretrained_weights/latest_net_G_B.pth"
+
+        self.netG_A.load_state_dict(torch.load(G_A_pretrained_path, map_location=self.device))
+        self.netG_B.load_state_dict(torch.load(G_B_pretrained_path, map_location=self.device))
+
+        print(f"Loaded pre-trained weights for G_A from {opt.pretrained_G_A_path}")
+        print(f"Loaded pre-trained weights for G_B from {opt.fdpretrained_G_B_path}")
+
         if self.isTrain:
             use_sigmoid = opt.no_lsgan
             self.netD_A = networks.define_D(
