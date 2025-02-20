@@ -22,7 +22,9 @@ def clean_subdir(
         input_path = os.path.join(src_dir, in_file)
         base_name, ext = os.path.splitext(in_file)
 
-        out_file = f"{int(base_name):04d}"
+        #out_file = f"{int(base_name):04d}"
+        out_file = base_name.zfill(4) 
+        
         if seg:
             out_file += "_0"
         out_file += ext
