@@ -314,13 +314,22 @@ def define_D(
             use_sigmoid=use_sigmoid,
         )
     elif netD == "set":
-        net = NLayerSetDiscriminator(
-            input_nc,
-            ndf,
-            n_layers=n_layers_D,
-            norm_layer=norm_layer,
-            use_sigmoid=use_sigmoid,
-        )
+        if seg_only:
+            net = NLayerSetMaskDiscriminator(
+                input_nc,
+                ndf,
+                n_layers=n_layers_D,
+                norm_layer=norm_layer,
+                use_sigmoid=use_sigmoid,
+            )
+        else:
+            net = NLayerSetDiscriminator(
+                input_nc,
+                ndf,
+                n_layers=n_layers_D,
+                norm_layer=norm_layer,
+                use_sigmoid=use_sigmoid,
+            )
     else:
         raise NotImplementedError(
             "Discriminator model name [%s] is not recognized" % net
