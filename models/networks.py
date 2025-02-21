@@ -380,8 +380,8 @@ class ResnetSetGenerator(nn.Module):
             output_nc, n_downsampling, 2 * ngf, norm_layer, use_bias
         )  # 2*ngf
         self.decoder_seg = self.get_decoder(
-            1, n_downsampling, 3 * ngf, norm_layer, use_bias
-        )  # 3*ngf
+            1, n_downsampling, 2 * ngf, norm_layer, use_bias
+        )  # 2*ngf
 
     def get_encoder(
         self,
@@ -458,7 +458,7 @@ class ResnetSetGenerator(nn.Module):
         img = inp[:, : self.input_nc, :, :]  # (B, CX, W, H)
         segs = inp[:, self.input_nc :, :, :]  # (B, CA, W, H)
 
-        # encder
+        # encoder
         enc_img = self.encoder_img(img)  # (B, ngf, W, H)
         enc_segs = self.encoder_seg(segs)  # (B, ngf, W, H)
 
@@ -466,7 +466,7 @@ class ResnetSetGenerator(nn.Module):
         img_feat = torch.cat([enc_img, enc_segs], dim=1)  # (B, 2*ngf, W, H)
         decoded_img = self.decoder_img(img_feat)  # (B, CX, W, H)
 
-        seg_feat = torch.cat([enc_segs, enc_img, enc_segs], dim=1)  # (B, 3*ngf, W, H)
+        seg_feat = torch.cat([enc_segs, enc_img], dim=1)  # (B, 2*ngf, W, H)
         decoded_seg = self.decoder_seg(seg_feat)  # (B, CA, W, H)
 
         out = torch.cat([decoded_img, decoded_seg], dim=1)  # (B, CX+CA, W, H)
