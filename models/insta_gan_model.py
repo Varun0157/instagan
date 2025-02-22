@@ -5,7 +5,7 @@ from .base_model import BaseModel
 from . import networks
 import numpy as np
 import copy
-
+from collections import OrderedDict
 
 class InstaGANModel(BaseModel):
     def name(self):
@@ -123,14 +123,46 @@ class InstaGANModel(BaseModel):
         )
 
     
-        G_A_pretrained_path = "../pretrained_weights/latest_net_G_A.pth"
-        G_B_pretrained_path = "../pretrained_weights/latest_net_G_B.pth"
+        """
+        NOTE : Instead of random initialization , load the pretrained weights and consider that as the initialization 
+        """
 
-        self.netG_A.load_state_dict(torch.load(G_A_pretrained_path, map_location=self.device))
-        self.netG_B.load_state_dict(torch.load(G_B_pretrained_path, map_location=self.device))
+        
+        G_A_pretrained_path = "/home2/aniruth.suresh/instagan-batched_attempt/pretrained_weights/latest_net_G_A.pth"
+        G_B_pretrained_path = "/home2/aniruth.suresh/instagan-batched_attempt/pretrained_weights/latest_net_G_B.pth"
 
-        print(f"Loaded pre-trained weights for G_A from {opt.pretrained_G_A_path}")
-        print(f"Loaded pre-trained weights for G_B from {opt.fdpretrained_G_B_path}")
+
+        state_dict_A = torch.load(G_A_pretrained_path, map_location=self.device)
+
+        new_state_dict_A = OrderedDict()
+        for k, v in state_dict_A.items():
+            new_key = f"module.{k}" if not k.startswith("module.") else k
+            new_state_dict_A[new_key] = v
+
+        print("Modified keys for G_A:", list(new_state_dict_A.keys())[:10])  
+
+        expected_keys_A = list(self.netG_A.state_dict().keys())  # Get expected keys from model
+        print("Expected model keys for G_A:", expected_keys_A[:10]) 
+
+        print("!!!! DONE FOR A !!!\n\n")
+        self.netG_A.load_state_dict(new_state_dict_A, strict=False)
+
+        state_dict_B = torch.load(G_B_pretrained_path, map_location=self.device)
+
+        new_state_dict_B = OrderedDict()
+        for k, v in state_dict_B.items():
+            new_key = f"module.{k}" if not k.startswith("module.") else k
+            new_state_dict_B[new_key] = v
+
+        print("Modified keys for G_B:", list(new_state_dict_B.keys())[:10]) 
+
+        expected_keys_B = list(self.netG_B.state_dict().keys())  
+        print("Expected model keys for G_B:", expected_keys_B[:10]) 
+
+        self.netG_B.load_state_dict(new_state_dict_B, strict=False)
+
+        print("!!!! DONE FOR B !!!\n\n")
+
 
         if self.isTrain:
             use_sigmoid = opt.no_lsgan
@@ -485,3 +517,5 @@ class InstaGANModel(BaseModel):
                 self.fake_B_seg = self.merge_masks(self.fake_B_seg_mul)
                 self.rec_A_seg = self.merge_masks(torch.cat(self.rec_A_seg_list, dim=1))
                 self.rec_B_seg = self.merge_masks(torch.cat(self.rec_B_seg_list, dim=1))
+
+
