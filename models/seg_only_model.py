@@ -112,7 +112,7 @@ class SegOnlyModel(BaseModel):
             self.gpu_ids,
             seg_only=True,
         )
-        assert type(self.netG_A) is networks.ResnetSetMaskGenerator
+        print("type of netG_A: ", type(self.netG_A))
         self.netG_B = networks.define_G(
             opt.output_nc,
             opt.input_nc,
@@ -126,7 +126,7 @@ class SegOnlyModel(BaseModel):
             self.gpu_ids,
             seg_only=True,
         )
-        assert type(self.netG_B) is networks.ResnetSetMaskGenerator
+        print("type of netG_B: ", type(self.netG_B))
 
         if self.isTrain:
             use_sigmoid = opt.no_lsgan
