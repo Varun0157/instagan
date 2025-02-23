@@ -99,6 +99,7 @@ if __name__ == "__main__":
     opt.model = "seg_only"
     seg_only_model = train(opt)
     assert type(seg_only_model) is SegOnlyModel
+    # seg_only_model.eval()
 
     opt.name = name
     opt.model = "insta_gan"
