@@ -262,6 +262,7 @@ def define_G(
         )
     elif netG == "set":
         if not seg_only:
+            print("creating not seg only generator for [set]")
             if mask_gen is None:
                 raise Exception(
                     "mask_gen must be provided for [set] generator in img gen mode"
@@ -276,6 +277,7 @@ def define_G(
                 n_blocks=9,
             )
         else:
+            print("creating seg only generator for [set]")
             net = ResnetSetMaskGenerator(
                 input_nc,
                 output_nc,
@@ -316,6 +318,7 @@ def define_D(
         )
     elif netD == "set":
         if seg_only:
+            print("creating seg only discriminator for [set]")
             net = NLayerSetMaskDiscriminator(
                 input_nc,
                 ndf,
@@ -324,6 +327,7 @@ def define_D(
                 use_sigmoid=use_sigmoid,
             )
         else:
+            print("creating not seg only discriminator for [set]")
             net = NLayerSetDiscriminator(
                 input_nc,
                 ndf,
