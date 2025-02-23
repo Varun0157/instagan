@@ -145,7 +145,7 @@ class ResnetSetMaskGenerator(nn.Module):
             else:
                 out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
         # return torch.cat(out, dim=1)
-        return torch.zeros_like(inp)
+        return torch.ones_like(inp, requires_grad=True)
 
 
 ###############################################################################
