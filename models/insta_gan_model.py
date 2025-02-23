@@ -107,6 +107,7 @@ class InstaGANModel(BaseModel):
             opt.init_type,
             opt.init_gain,
             self.gpu_ids,
+            seg_only=False,
         )
         self.netG_B = networks.define_G(
             opt.output_nc,
@@ -119,6 +120,7 @@ class InstaGANModel(BaseModel):
             opt.init_type,
             opt.init_gain,
             self.gpu_ids,
+            seg_only=False,
         )
 
         if self.isTrain:
@@ -133,6 +135,7 @@ class InstaGANModel(BaseModel):
                 opt.init_type,
                 opt.init_gain,
                 self.gpu_ids,
+                seg_only=False,
             )
             self.netD_B = networks.define_D(
                 opt.input_nc,
@@ -144,6 +147,7 @@ class InstaGANModel(BaseModel):
                 opt.init_type,
                 opt.init_gain,
                 self.gpu_ids,
+                seg_only=False,
             )
 
         if self.isTrain:

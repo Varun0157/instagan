@@ -112,6 +112,7 @@ class SegOnlyModel(BaseModel):
             self.gpu_ids,
             seg_only=True,
         )
+        assert type(self.netG_A) is networks.ResnetSetMaskGenerator
         self.netG_B = networks.define_G(
             opt.output_nc,
             opt.input_nc,
@@ -125,6 +126,8 @@ class SegOnlyModel(BaseModel):
             self.gpu_ids,
             seg_only=True,
         )
+        assert type(self.netG_B) is networks.ResnetSetMaskGenerator
+
         if self.isTrain:
             use_sigmoid = opt.no_lsgan
             self.netD_A = networks.define_D(
@@ -139,6 +142,7 @@ class SegOnlyModel(BaseModel):
                 self.gpu_ids,
                 seg_only=True,
             )
+            assert type(self.netD_A) is networks.NLayerSetMaskDiscriminator
             self.netD_B = networks.define_D(
                 opt.input_nc,
                 opt.ndf,
@@ -151,6 +155,7 @@ class SegOnlyModel(BaseModel):
                 self.gpu_ids,
                 seg_only=True,
             )
+            assert type(self.netD_B) is networks.NLayerSetMaskDiscriminator
 
         if self.isTrain:
             self.fake_A_pool = ImagePool(opt.pool_size)
