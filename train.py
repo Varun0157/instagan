@@ -91,18 +91,21 @@ if __name__ == "__main__":
 
     name = opt.name
     model = opt.model
+    lr = opt.lr
 
     if model != "insta_gan":
         raise Exception("Model not found")
 
     opt.name = name + "_seg"
     opt.model = "seg_only"
+    opt.lr = lr * 2
     seg_only_model = train(opt)
     assert type(seg_only_model) is SegOnlyModel
     # seg_only_model.eval()
 
     opt.name = name
     opt.model = "insta_gan"
+    opt.lr = lr
     final_model = train(opt, seg_only_model)
 
     assert type(run) is wandb.sdk.wandb_run.Run
